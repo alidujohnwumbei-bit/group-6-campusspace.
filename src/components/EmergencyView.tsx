@@ -28,7 +28,7 @@ const ISSUE_TYPES: EmergencyIssueType[] = [
 const URGENCY_LEVELS: EmergencyUrgency[] = ['Critical', 'High', 'Standard'];
 
 export function EmergencyView({ rooms, emergencies, profile }: EmergencyViewProps) {
-  const availableStandbyRooms = rooms.filter((r) => r.status === 'Available');
+  const availableStandbyRooms = rooms.filter((r) => r.status === 'Available' && !r.blocked);
 
   const [roomId, setRoomId] = useState(rooms[0]?.id ?? '');
   const [issueType, setIssueType] = useState<EmergencyIssueType>('Microphone / Audio Failure');
@@ -72,7 +72,7 @@ export function EmergencyView({ rooms, emergencies, profile }: EmergencyViewProp
     setResolvingId(em.id);
     setError(null);
     try {
-      await resolveEmergencyDispatch(em, true);
+      await resolveEmergencyDispatch(em, profile, true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to resolve emergency.');
     } finally {
@@ -87,7 +87,7 @@ export function EmergencyView({ rooms, emergencies, profile }: EmergencyViewProp
           Emergency Classroom &amp; AV Dispatch
         </h1>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-          Flag urgent classroom outages, allocate immediate standby lecture halls, and coordinate AV support.
+          Flag urgent classroom outages, request immediate standby lecture halls, and coordinate AV support.
         </p>
       </div>
 
@@ -98,7 +98,6 @@ export function EmergencyView({ rooms, emergencies, profile }: EmergencyViewProp
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Dispatch Form */}
         <section className="lg:col-span-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 space-y-4">
           <div className="flex items-center gap-2">
             <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-400" />
@@ -110,7 +109,7 @@ export function EmergencyView({ rooms, emergencies, profile }: EmergencyViewProp
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Affected Classroom
+                Affected Venue
               </label>
               <select
                 value={selectedRoom?.id ?? ''}
@@ -162,14 +161,14 @@ export function EmergencyView({ rooms, emergencies, profile }: EmergencyViewProp
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Assign Standby Relocation Room (Optional)
+                Suggested Standby Relocation Venue (Optional)
               </label>
               <select
                 value={standbyId}
                 onChange={(e) => setStandbyId(e.target.value)}
                 className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-600"
               >
-                <option value="">No relocation room needed (AV technician only)</option>
+                <option value="">No relocation venue needed (AV technician only)</option>
                 {availableStandbyRooms.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.code} — {r.name} (Cap {r.capacity} · Mic {r.micBattery}%)
@@ -208,14 +207,13 @@ export function EmergencyView({ rooms, emergencies, profile }: EmergencyViewProp
           </form>
         </section>
 
-        {/* Active & Resolved Dispatches */}
         <section className="lg:col-span-7 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
             <h2 className="text-base font-bold text-slate-900 dark:text-white">
               Dispatch Queue ({emergencies.length})
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Live emergency requisitions and standby room assignments
+              Live emergency requisitions and standby venue assignments
             </p>
           </div>
 

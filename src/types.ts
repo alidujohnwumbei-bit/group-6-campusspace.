@@ -1,11 +1,14 @@
 import type { Timestamp } from 'firebase/firestore';
 
+export type SystemRole = 'student' | 'lecturer' | 'admin';
+
 export type CampusRole =
   | 'Lecturer'
   | 'Class Representative'
   | 'AV Technician'
   | 'Department Coordinator'
-  | 'Student';
+  | 'Student'
+  | 'Administrator';
 
 export type CampusZone =
   | 'New Site'
@@ -18,14 +21,14 @@ export type RoomStatus =
   | 'Available'
   | 'Occupied'
   | 'Reserved'
-  | 'Cancelled'
+  | 'Maintenance'
   | 'Emergency';
 
 export type MicStatus = 'Ready' | 'Low Battery' | 'Charging' | 'Faulty' | 'None';
 
 export type SpeakerStatus = 'Operational' | 'Muted' | 'Faulty' | 'Maintenance';
 
-export type BookingStatus = 'Reserved' | 'Occupied' | 'Cancelled' | 'Completed';
+export type BookingStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 
 export type EmergencyIssueType =
   | 'Microphone / Audio Failure'
@@ -46,8 +49,10 @@ export interface UserProfile {
   email: string;
   uccId: string;
   department: string;
+  role: SystemRole;
   campusRole: CampusRole;
   phone: string;
+  disabled: boolean;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -60,6 +65,8 @@ export interface Classroom {
   campusZone: CampusZone;
   capacity: number;
   status: RoomStatus;
+  blocked: boolean;
+  maintenanceNote: string;
   currentCourse: string;
   currentLecturer: string;
   timeSlot: string;
@@ -83,12 +90,32 @@ export interface Booking {
   endTime: string;
   attendeesCount: number;
   status: BookingStatus;
-  cancellationReason: string;
+  requestedBy: string;
+  requestedAt?: Timestamp;
+  reviewedBy: string;
+  reviewedByName: string;
+  reviewedAt?: Timestamp | null;
+  reason: string;
   cancelledByName: string;
   ownerId: string;
   ownerName: string;
   ownerDepartment: string;
   createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface VenueSchedule {
+  id: string;
+  venueId: string;
+  venueCode: string;
+  venueName: string;
+  courseCode: string;
+  courseTitle: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  status: 'approved' | 'cancelled';
+  requestedBy: string;
   updatedAt?: Timestamp;
 }
 
@@ -119,12 +146,25 @@ export interface AvLog {
   createdAt?: Timestamp;
 }
 
+export interface ActivityLog {
+  id: string;
+  action: string;
+  target: string;
+  details: string;
+  actorId: string;
+  actorName: string;
+  actorRole: SystemRole;
+  createdAt?: Timestamp;
+}
+
+export const SYSTEM_ROLES: SystemRole[] = ['student', 'lecturer', 'admin'];
+
 export const CAMPUS_ROLES: CampusRole[] = [
-  'Lecturer',
+  'Student',
   'Class Representative',
+  'Lecturer',
   'AV Technician',
   'Department Coordinator',
-  'Student',
 ];
 
 export const CAMPUS_ZONES: CampusZone[] = [
@@ -149,6 +189,7 @@ export const UCC_DEPARTMENTS: string[] = [
 
 export const VALIDATION_LIMITS = {
   uccIdRegex: /^[a-zA-Z0-9/_-]+$/,
+  venueIdRegex: /^[a-zA-Z0-9_-]+$/,
   fullNameMax: 100,
   emailMax: 150,
   uccIdMax: 32,
@@ -156,7 +197,8 @@ export const VALIDATION_LIMITS = {
   phoneMax: 24,
   courseCodeMax: 24,
   courseTitleMax: 120,
-  cancellationReasonMax: 240,
+  reasonMax: 240,
+  maintenanceNoteMax: 200,
   emergencyDescMax: 400,
   avActionMax: 120,
 } as const;

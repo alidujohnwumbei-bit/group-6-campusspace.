@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import {
   AlertTriangle,
   Building2,
+  Calendar,
   CalendarClock,
   LayoutDashboard,
   LogOut,
@@ -9,6 +10,7 @@ import {
   Mic,
   Moon,
   Plus,
+  ShieldCheck,
   Sun,
   UserCog,
   X,
@@ -23,19 +25,21 @@ interface DashboardLayoutProps {
   onOpenBookingModal: () => void;
   onLogout: () => Promise<void>;
   openEmergencyCount: number;
+  pendingAdminCount: number;
   darkMode: boolean;
   onToggleDarkMode: () => void;
   children: ReactNode;
 }
 
-const NAV_ITEMS: Array<{
+const BASE_NAV_ITEMS: Array<{
   id: DashboardTab;
   label: string;
   icon: typeof LayoutDashboard;
 }> = [
   { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'rooms', label: 'Classrooms', icon: Building2 },
-  { id: 'bookings', label: 'Reservations', icon: CalendarClock },
+  { id: 'rooms', label: 'Venues & Search', icon: Building2 },
+  { id: 'calendar', label: 'Availability Calendar', icon: Calendar },
+  { id: 'bookings', label: 'My Bookings', icon: CalendarClock },
   { id: 'emergency', label: 'Emergency Dispatch', icon: AlertTriangle },
   { id: 'av', label: 'AV & Audio Gear', icon: Mic },
   { id: 'account', label: 'My Account', icon: UserCog },
@@ -48,14 +52,23 @@ export function DashboardLayout({
   onOpenBookingModal,
   onLogout,
   openEmergencyCount,
+  pendingAdminCount,
   darkMode,
   onToggleDarkMode,
   children,
 }: DashboardLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const navItems =
+    profile.role === 'admin'
+      ? [
+          ...BASE_NAV_ITEMS,
+          { id: 'admin' as DashboardTab, label: 'Admin Panel', icon: ShieldCheck },
+        ]
+      : BASE_NAV_ITEMS;
+
   const currentLabel =
-    NAV_ITEMS.find((item) => item.id === activeTab)?.label ?? 'Dashboard';
+    navItems.find((item) => item.id === activeTab)?.label ?? 'Dashboard';
 
   function handleNavClick(tab: DashboardTab) {
     onSelectTab(tab);
@@ -64,7 +77,6 @@ export function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex">
-      {/* Mobile Sidebar Backdrop */}
       {mobileMenuOpen && (
         <div
           className="fixed inset-0 z-40 bg-slate-950/50 lg:hidden"
@@ -72,16 +84,14 @@ export function DashboardLayout({
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between transition-transform duration-200 lg:static lg:translate-x-0 ${
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div>
-          {/* Brand Zone */}
           <div className="h-16 px-6 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
-            <span className="text-base font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap shrink-0">
+            <span className="text-base font-bold tracking-tight text-[#0B2D5B] dark:text-white whitespace-nowrap shrink-0">
               CampusSpace UCC
             </span>
             <button
@@ -94,11 +104,11 @@ export function DashboardLayout({
             </button>
           </div>
 
-          {/* Primary Navigation */}
           <nav className="p-4 space-y-1" aria-label="Primary navigation">
-            {NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
+              const isAdminItem = item.id === 'admin';
               return (
                 <button
                   key={item.id}
@@ -106,8 +116,12 @@ export function DashboardLayout({
                   onClick={() => handleNavClick(item.id)}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
                     isActive
-                      ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300'
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
+                      ? isAdminItem
+                        ? 'bg-[#0B2D5B] text-amber-300'
+                        : 'bg-blue-50 dark:bg-blue-950/60 text-[#0B2D5B] dark:text-blue-300'
+                      : isAdminItem
+                        ? 'text-[#0B2D5B] dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-slate-800/60'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   <span className="flex items-center gap-3 min-w-0">
@@ -119,13 +133,17 @@ export function DashboardLayout({
                       {openEmergencyCount}
                     </span>
                   )}
+                  {item.id === 'admin' && pendingAdminCount > 0 && (
+                    <span className="font-mono text-xs text-amber-600 dark:text-amber-300 font-bold">
+                      {pendingAdminCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </nav>
         </div>
 
-        {/* Authenticated User Footer + Logout */}
         <div className="p-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
           <button
             type="button"
@@ -135,8 +153,8 @@ export function DashboardLayout({
             <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
               {profile.fullName}
             </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
-              {profile.campusRole} · <span className="font-mono">{profile.uccId}</span>
+            <div className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5 capitalize">
+              {profile.role} · <span className="font-mono">{profile.uccId}</span>
             </div>
           </button>
 
@@ -151,9 +169,7 @@ export function DashboardLayout({
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <div className="flex-1 min-w-0 flex flex-col">
-        {/* Top Bar Contract */}
         <header className="h-16 px-4 sm:px-8 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4 sticky top-0 z-30">
           <div className="flex items-center gap-3 min-w-0">
             <button
@@ -187,10 +203,10 @@ export function DashboardLayout({
             <button
               type="button"
               onClick={onOpenBookingModal}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-lg transition-colors whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-[#0B2D5B] hover:bg-blue-900 rounded-lg transition-colors whitespace-nowrap shrink-0"
             >
               <Plus className="h-3.5 w-3.5" />
-              <span>Reserve Room</span>
+              <span>Request Venue</span>
             </button>
 
             <button

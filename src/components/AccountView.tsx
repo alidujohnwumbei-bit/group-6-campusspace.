@@ -33,6 +33,9 @@ export function AccountView({
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
+  const roleChoices: CampusRole[] =
+    profile.role === 'admin' ? ['Administrator', ...CAMPUS_ROLES] : CAMPUS_ROLES;
+
   async function handleSave(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -101,7 +104,6 @@ export function AccountView({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Identity Summary Card */}
         <section className="lg:col-span-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 space-y-5">
           <div className="flex items-center gap-4">
             {!avatarFailed ? (
@@ -113,7 +115,7 @@ export function AccountView({
                 className="h-14 w-14 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0"
               />
             ) : (
-              <div className="h-14 w-14 rounded-xl bg-blue-700 text-white font-bold text-lg flex items-center justify-center shrink-0">
+              <div className="h-14 w-14 rounded-xl bg-[#0B2D5B] text-white font-bold text-lg flex items-center justify-center shrink-0">
                 {initials || 'UC'}
               </div>
             )}
@@ -121,13 +123,19 @@ export function AccountView({
               <h2 className="text-base font-bold text-slate-900 dark:text-white truncate">
                 {profile.fullName}
               </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                {profile.campusRole}
+              <p className="text-xs text-slate-500 dark:text-slate-400 capitalize truncate">
+                {profile.role} · {profile.campusRole}
               </p>
             </div>
           </div>
 
           <div className="space-y-2.5 pt-4 border-t border-slate-100 dark:border-slate-800 text-xs">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-slate-500 dark:text-slate-400">System Role</span>
+              <span className="font-mono font-semibold uppercase text-[#0B2D5B] dark:text-amber-300">
+                {profile.role}
+              </span>
+            </div>
             <div className="flex items-center justify-between gap-2">
               <span className="text-slate-500 dark:text-slate-400">UCC ID</span>
               <span className="font-mono font-semibold text-slate-900 dark:text-white">
@@ -171,7 +179,6 @@ export function AccountView({
           </div>
         </section>
 
-        {/* Edit Profile Form */}
         <section className="lg:col-span-8 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6">
           <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4">
             Update Account Information
@@ -223,14 +230,14 @@ export function AccountView({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Campus Role
+                  Academic Role Label
                 </label>
                 <select
                   value={campusRole}
                   onChange={(e) => setCampusRole(e.target.value as CampusRole)}
                   className="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-600"
                 >
-                  {CAMPUS_ROLES.map((r) => (
+                  {roleChoices.map((r) => (
                     <option key={r} value={r}>
                       {r}
                     </option>
@@ -274,7 +281,7 @@ export function AccountView({
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 disabled:opacity-60 rounded-lg transition-colors whitespace-nowrap"
+                className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-[#0B2D5B] hover:bg-blue-900 disabled:opacity-60 rounded-lg transition-colors whitespace-nowrap"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 <span>Save Changes</span>

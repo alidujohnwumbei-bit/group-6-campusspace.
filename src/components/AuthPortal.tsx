@@ -22,12 +22,13 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { auth, googleProvider } from '../firebase';
-import { createUserProfile, sanitizeUccId } from '../services/campusService';
+import { createUserProfile, resolveDefaultRole, sanitizeUccId } from '../services/campusService';
 import {
   CAMPUS_ROLES,
   UCC_DEPARTMENTS,
   VALIDATION_LIMITS,
   type CampusRole,
+  type SystemRole,
   type UserProfile,
 } from '../types';
 
@@ -52,20 +53,26 @@ export function AuthPortal({
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
 
-  // Registration / Profile completion fields
+  // Registration / Profile completion fields (default system role = student)
   const [fullName, setFullName] = useState(pendingGoogleUser?.displayName ?? '');
   const [regEmail, setRegEmail] = useState(pendingGoogleUser?.email ?? '');
   const [regPassword, setRegPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [uccId, setUccId] = useState('');
-  const [campusRole, setCampusRole] = useState<CampusRole>('Lecturer');
+  const [campusRole, setCampusRole] = useState<CampusRole>('Student');
   const [department, setDepartment] = useState(UCC_DEPARTMENTS[0]);
   const [phone, setPhone] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [emailProviderNotice, setEmailProviderNotice] = useState(false);
+
+  function deriveSystemRole(email: string, selectedCampusRole: CampusRole): SystemRole {
+    if (email.trim().toLowerCase() === 'admin@ucc.edu.gh') return 'admin';
+    if (selectedCampusRole === 'Lecturer') return 'lecturer';
+    return 'student';
+  }
 
   function mapAuthError(err: unknown): string {
     const code = (err as { code?: string })?.code ?? '';
@@ -145,12 +152,17 @@ export function AuthPortal({
       await updateProfile(credential.user, {
         displayName: fullName.trim(),
       });
+      const systemRole = resolveDefaultRole(
+        regEmail.trim(),
+        deriveSystemRole(regEmail.trim(), campusRole)
+      );
       const profile = await createUserProfile({
         uid: credential.user.uid,
         fullName: fullName.trim(),
         email: regEmail.trim(),
         uccId: cleanedId,
         department,
+        role: systemRole,
         campusRole,
         phone: phone.trim(),
       });
@@ -179,12 +191,18 @@ export function AuthPortal({
 
     setSubmitting(true);
     try {
+      const userEmail = pendingGoogleUser.email ?? 'member@ucc.edu.gh';
+      const systemRole = resolveDefaultRole(
+        userEmail,
+        deriveSystemRole(userEmail, campusRole)
+      );
       const profile = await createUserProfile({
         uid: pendingGoogleUser.uid,
         fullName: fullName.trim(),
-        email: pendingGoogleUser.email ?? 'member@ucc.edu.gh',
+        email: userEmail,
         uccId: cleanedId,
         department,
+        role: systemRole,
         campusRole,
         phone: phone.trim(),
       });
@@ -222,9 +240,9 @@ export function AuthPortal({
             className="absolute inset-0 h-full w-full object-cover"
           />
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900" />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#0B2D5B] via-slate-900 to-slate-950" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/70 to-slate-950/40" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/70 to-[#0B2D5B]/55" />
 
         <div className="relative z-10 p-10 xl:p-14 flex items-center justify-between">
           <div>
@@ -244,7 +262,7 @@ export function AuthPortal({
               Coordinate every lecture hall, booking, and audio system across UCC.
             </h1>
             <p className="text-base text-slate-200 leading-relaxed max-w-xl">
-              Track live classroom availability from New Lecture Theatre to Old Site, manage reservations and cancellations, dispatch emergency standby rooms, and monitor microphone and speaker readiness.
+              Track live venue availability from New Lecture Theatre to Old Site, submit reservation requests for admin approval, dispatch emergency standby rooms, and monitor microphone and speaker readiness.
             </p>
           </div>
 
@@ -270,10 +288,10 @@ export function AuthPortal({
             <div className="space-y-1.5">
               <div className="flex items-center gap-2 text-amber-300 text-xs font-semibold">
                 <ShieldCheck className="h-4 w-4" />
-                <span>Role-Verified</span>
+                <span>Approved Scheduling</span>
               </div>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Authenticated accounts for lecturers, reps, and AV technicians.
+                Role-verified booking workflows for students, lecturers, and admins.
               </p>
             </div>
           </div>
@@ -283,7 +301,6 @@ export function AuthPortal({
       {/* Right Authentication Form Column */}
       <div className="lg:col-span-6 xl:col-span-5 flex flex-col justify-center px-6 py-10 sm:px-12 lg:px-14 bg-white dark:bg-slate-950">
         <div className="w-full max-w-md mx-auto space-y-6">
-          {/* Mobile Brand Header */}
           <div className="lg:hidden pb-4 border-b border-slate-200 dark:border-slate-800">
             <span className="text-xl font-bold tracking-tight">CampusSpace UCC</span>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -292,7 +309,6 @@ export function AuthPortal({
           </div>
 
           {pendingGoogleUser ? (
-            /* Step 2 for first-time Google Sign-In users: Complete Account Information */
             <div className="space-y-6">
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-400">
@@ -303,7 +319,7 @@ export function AuthPortal({
                   Complete your UCC account profile
                 </h2>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Signed in as <span className="font-medium text-slate-900 dark:text-slate-200">{pendingGoogleUser.email}</span>. Provide your university details to unlock the dashboard.
+                  Signed in as <span className="font-medium text-slate-900 dark:text-slate-200">{pendingGoogleUser.email}</span>. Provide your university details to continue.
                 </p>
               </div>
 
@@ -325,7 +341,7 @@ export function AuthPortal({
                     maxLength={VALIDATION_LIMITS.fullNameMax}
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Dr. Kwame Mensah"
+                    placeholder="Kwame Mensah"
                     className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
                   />
                 </div>
@@ -347,7 +363,7 @@ export function AuthPortal({
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Campus Role
+                      Academic Role
                     </label>
                     <select
                       value={campusRole}
@@ -382,7 +398,7 @@ export function AuthPortal({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Phone Number (for emergency dispatch alerts)
+                    Phone Number
                   </label>
                   <div className="relative">
                     <Phone className="h-4 w-4 text-slate-400 absolute left-3.5 top-3" />
@@ -411,7 +427,7 @@ export function AuthPortal({
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 disabled:opacity-60 rounded-lg transition-colors whitespace-nowrap shrink-0"
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-[#0B2D5B] hover:bg-blue-900 disabled:opacity-60 rounded-lg transition-colors whitespace-nowrap shrink-0"
                   >
                     {submitting ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -426,7 +442,6 @@ export function AuthPortal({
               </form>
             </div>
           ) : (
-            /* Sign In / Create Account View */
             <>
               <div className="space-y-2">
                 <h2 className="text-2xl font-bold tracking-tight">
@@ -434,12 +449,11 @@ export function AuthPortal({
                 </h2>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
                   {mode === 'login'
-                    ? 'Access live classroom occupancy, bookings, and AV diagnostics.'
-                    : 'Register your university credentials to reserve rooms and manage AV gear.'}
+                    ? 'Access live venue availability, bookings, and AV diagnostics.'
+                    : 'New accounts default to Student access; admins manage approvals.'}
                 </p>
               </div>
 
-              {/* Mode Switcher */}
               <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
@@ -532,7 +546,7 @@ export function AuthPortal({
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 disabled:opacity-60 rounded-lg transition-colors whitespace-nowrap"
+                    className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-[#0B2D5B] hover:bg-blue-900 disabled:opacity-60 rounded-lg transition-colors whitespace-nowrap"
                   >
                     {submitting ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -595,7 +609,7 @@ export function AuthPortal({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                        Campus Role
+                        Academic Role
                       </label>
                       <select
                         value={campusRole}
@@ -685,7 +699,7 @@ export function AuthPortal({
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 disabled:opacity-60 rounded-lg transition-colors whitespace-nowrap"
+                    className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-[#0B2D5B] hover:bg-blue-900 disabled:opacity-60 rounded-lg transition-colors whitespace-nowrap"
                   >
                     {submitting ? (
                       <Loader2 className="h-4 w-4 animate-spin" />

@@ -2,7 +2,7 @@
   "entities": {
     "UserProfile": {
       "title": "User Profile",
-      "description": "Authenticated UCC CampusSpace member profile containing university identity, role, and contact details.",
+      "description": "Authenticated UCC CampusSpace member profile containing university identity, system role, and account status.",
       "type": "object",
       "properties": {
         "uid": {
@@ -31,13 +31,20 @@
           "minLength": 2,
           "maxLength": 100
         },
+        "role": {
+          "type": "string",
+          "enum": ["student", "lecturer", "admin"]
+        },
         "campusRole": {
           "type": "string",
-          "enum": ["Lecturer", "Class Representative", "AV Technician", "Department Coordinator", "Student"]
+          "enum": ["Lecturer", "Class Representative", "AV Technician", "Department Coordinator", "Student", "Administrator"]
         },
         "phone": {
           "type": "string",
           "maxLength": 24
+        },
+        "disabled": {
+          "type": "boolean"
         },
         "createdAt": {
           "type": "string",
@@ -48,11 +55,11 @@
           "format": "date-time"
         }
       },
-      "required": ["uid", "fullName", "email", "uccId", "department", "campusRole", "phone", "createdAt", "updatedAt"]
+      "required": ["uid", "fullName", "email", "uccId", "department", "role", "campusRole", "phone", "disabled", "createdAt", "updatedAt"]
     },
-    "Classroom": {
-      "title": "Classroom & Lecture Theatre",
-      "description": "University of Cape Coast classroom, lecture theatre, or lab with live occupancy and AV readiness state.",
+    "Venue": {
+      "title": "Venue & Lecture Theatre",
+      "description": "University of Cape Coast classroom, lecture theatre, or lab managed by administrators.",
       "type": "object",
       "properties": {
         "code": {
@@ -79,7 +86,14 @@
         },
         "status": {
           "type": "string",
-          "enum": ["Available", "Occupied", "Reserved", "Cancelled", "Emergency"]
+          "enum": ["Available", "Occupied", "Reserved", "Maintenance", "Emergency"]
+        },
+        "blocked": {
+          "type": "boolean"
+        },
+        "maintenanceNote": {
+          "type": "string",
+          "maxLength": 200
         },
         "currentCourse": {
           "type": "string",
@@ -117,11 +131,11 @@
           "format": "date-time"
         }
       },
-      "required": ["code", "name", "building", "campusZone", "capacity", "status", "currentCourse", "currentLecturer", "timeSlot", "micStatus", "micBattery", "speakerStatus", "projectorReady", "updatedBy", "updatedAt"]
+      "required": ["code", "name", "building", "campusZone", "capacity", "status", "blocked", "maintenanceNote", "currentCourse", "currentLecturer", "timeSlot", "micStatus", "micBattery", "speakerStatus", "projectorReady", "updatedBy", "updatedAt"]
     },
     "Booking": {
-      "title": "Classroom Booking",
-      "description": "Classroom reservation, active lecture session, or cancelled booking record.",
+      "title": "Venue Booking Request",
+      "description": "Classroom booking request requiring administrator approval, with full audit fields.",
       "type": "object",
       "properties": {
         "roomId": {
@@ -169,9 +183,30 @@
         },
         "status": {
           "type": "string",
-          "enum": ["Reserved", "Occupied", "Cancelled", "Completed"]
+          "enum": ["pending", "approved", "rejected", "cancelled"]
         },
-        "cancellationReason": {
+        "requestedBy": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "requestedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "reviewedBy": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "reviewedByName": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "reviewedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "reason": {
           "type": "string",
           "maxLength": 240
         },
@@ -203,7 +238,61 @@
           "format": "date-time"
         }
       },
-      "required": ["roomId", "roomCode", "roomName", "courseCode", "courseTitle", "date", "startTime", "endTime", "attendeesCount", "status", "cancellationReason", "cancelledByName", "ownerId", "ownerName", "ownerDepartment", "createdAt", "updatedAt"]
+      "required": ["roomId", "roomCode", "roomName", "courseCode", "courseTitle", "date", "startTime", "endTime", "attendeesCount", "status", "requestedBy", "requestedAt", "reviewedBy", "reviewedByName", "reason", "cancelledByName", "ownerId", "ownerName", "ownerDepartment", "createdAt", "updatedAt"]
+    },
+    "VenueSchedule": {
+      "title": "Public Approved Venue Schedule",
+      "description": "Sanitized approved venue booking slots for campus availability calendar display without user PII.",
+      "type": "object",
+      "properties": {
+        "venueId": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "venueCode": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "venueName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "courseCode": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "courseTitle": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "date": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "startTime": {
+          "type": "string",
+          "maxLength": 10
+        },
+        "endTime": {
+          "type": "string",
+          "maxLength": 10
+        },
+        "status": {
+          "type": "string",
+          "enum": ["approved", "cancelled"]
+        },
+        "requestedBy": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["venueId", "venueCode", "venueName", "courseCode", "courseTitle", "date", "startTime", "endTime", "status", "requestedBy", "updatedAt"]
     },
     "EmergencyRequest": {
       "title": "Emergency Classroom & AV Dispatch",
@@ -305,20 +394,64 @@
         }
       },
       "required": ["roomId", "roomCode", "gearType", "action", "batteryAfter", "ownerId", "ownerName", "createdAt"]
+    },
+    "ActivityLog": {
+      "title": "System Activity Log",
+      "description": "Audit log tracking booking submissions, approvals, rejections, cancellations, and admin changes.",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "details": {
+          "type": "string",
+          "maxLength": 280
+        },
+        "actorId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "actorName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "actorRole": {
+          "type": "string",
+          "enum": ["student", "lecturer", "admin"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["action", "target", "details", "actorId", "actorName", "actorRole", "createdAt"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": { "$ref": "#/entities/UserProfile" },
-      "description": "Private user account profile keyed by Firebase Auth UID."
+      "description": "User account profile with role (student/lecturer/admin) and disabled flag."
     },
-    "/rooms/{roomId}": {
-      "schema": { "$ref": "#/entities/Classroom" },
-      "description": "UCC campus classrooms, lecture theatres, and AV gear readiness state."
+    "/venues/{venueId}": {
+      "schema": { "$ref": "#/entities/Venue" },
+      "description": "UCC campus venues, classrooms, and AV readiness state (admin-writable)."
     },
     "/bookings/{bookingId}": {
       "schema": { "$ref": "#/entities/Booking" },
-      "description": "Classroom bookings, live sessions, and cancellation records."
+      "description": "Venue booking requests with approval/rejection workflow."
+    },
+    "/venueSchedules/{scheduleId}": {
+      "schema": { "$ref": "#/entities/VenueSchedule" },
+      "description": "Public approved venue slots for campus availability calendar."
     },
     "/emergencies/{emergencyId}": {
       "schema": { "$ref": "#/entities/EmergencyRequest" },
@@ -327,6 +460,10 @@
     "/avLogs/{logId}": {
       "schema": { "$ref": "#/entities/AvLog" },
       "description": "Immutable audio gear maintenance and battery swap logs."
+    },
+    "/activityLogs/{logId}": {
+      "schema": { "$ref": "#/entities/ActivityLog" },
+      "description": "Immutable audit log of bookings, reviews, and venue/user management actions."
     }
   }
 }

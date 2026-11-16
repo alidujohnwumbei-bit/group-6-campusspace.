@@ -6,6 +6,7 @@ import {
   Mic,
   Plus,
   Radio,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   CAMPUS_ZONES,
@@ -14,15 +15,17 @@ import {
   type EmergencyRequest,
   type UserProfile,
 } from '../types';
-import { StatusLabel } from './StatusLabel';
+import { BookingStatusBadge, StatusLabel } from './StatusLabel';
 
 export type DashboardTab =
   | 'overview'
   | 'rooms'
+  | 'calendar'
   | 'bookings'
   | 'emergency'
   | 'av'
-  | 'account';
+  | 'account'
+  | 'admin';
 
 interface OverviewViewProps {
   profile: UserProfile;
@@ -99,7 +102,9 @@ export function OverviewView({
       <section className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-            <span>{profile.campusRole}</span>
+            <span className="capitalize font-semibold text-[#0B2D5B] dark:text-amber-300">
+              {profile.role}
+            </span>
             <span aria-hidden="true">·</span>
             <span>{profile.department}</span>
             <span aria-hidden="true">·</span>
@@ -114,6 +119,16 @@ export function OverviewView({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 shrink-0">
+          {profile.role === 'admin' && (
+            <button
+              type="button"
+              onClick={() => onNavigate('admin')}
+              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors whitespace-nowrap shrink-0"
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+              <span>Admin Panel</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onNavigate('emergency')}
@@ -125,10 +140,10 @@ export function OverviewView({
           <button
             type="button"
             onClick={() => onOpenBookingModal()}
-            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-lg transition-colors whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-[#0B2D5B] hover:bg-blue-900 rounded-lg transition-colors whitespace-nowrap shrink-0"
           >
             <Plus className="h-3.5 w-3.5" />
-            <span>Reserve Classroom</span>
+            <span>Request Venue</span>
           </button>
         </div>
       </section>
@@ -145,11 +160,11 @@ export function OverviewView({
               {availableCount}
             </span>
             <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
-              / {totalRooms} rooms
+              / {totalRooms} venues
             </span>
           </div>
           <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">
-            Ready for immediate booking or standby
+            Open for booking requests
           </p>
         </div>
 
@@ -199,18 +214,18 @@ export function OverviewView({
               {avReadyPct}%
             </span>
             <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
-              {avReadyCount}/{totalRooms} rooms
+              {avReadyCount}/{totalRooms} venues
             </span>
           </div>
           <p className="text-xs text-slate-600 dark:text-slate-400">
-            {avAttentionRooms.length} rooms need battery or speaker service
+            {avAttentionRooms.length} venues need battery or speaker service
           </p>
         </div>
       </section>
 
       {/* Main Content Split */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left: Campus Zone Utilization + Live Room Snapshot */}
+        {/* Left: Campus Zone Utilization + Live Venue Snapshot */}
         <div className="lg:col-span-7 space-y-6">
           <section className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 space-y-4">
             <div className="flex items-center justify-between">
@@ -219,15 +234,15 @@ export function OverviewView({
                   Campus Zone Occupancy
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Room availability distribution across UCC academic zones
+                  Venue availability distribution across UCC academic zones
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => onNavigate('rooms')}
+                onClick={() => onNavigate('calendar')}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 dark:text-blue-400 hover:underline whitespace-nowrap shrink-0"
               >
-                <span>All Classrooms</span>
+                <span>Availability Calendar</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </button>
             </div>
@@ -252,7 +267,7 @@ export function OverviewView({
                     </div>
                     <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-blue-600 dark:bg-blue-500 transition-all duration-300"
+                        className="h-full rounded-full bg-[#0B2D5B] dark:bg-blue-500 transition-all duration-300"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -266,7 +281,7 @@ export function OverviewView({
             <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                  Live Classroom Snapshot
+                  Live Venue Snapshot
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   Current status and wireless mic battery levels
@@ -277,7 +292,7 @@ export function OverviewView({
                 onClick={() => onNavigate('rooms')}
                 className="text-xs font-semibold text-blue-700 dark:text-blue-400 hover:underline whitespace-nowrap shrink-0"
               >
-                Manage All
+                All Venues
               </button>
             </div>
 
@@ -285,7 +300,7 @@ export function OverviewView({
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    <th className="py-3 px-6">Room</th>
+                    <th className="py-3 px-6">Venue</th>
                     <th className="py-3 px-4">Status</th>
                     <th className="py-3 px-4">Course / Assignment</th>
                     <th className="py-3 px-4 text-right">Mic</th>
@@ -311,7 +326,7 @@ export function OverviewView({
                       </td>
                       <td className="py-3 px-4 text-slate-700 dark:text-slate-300">
                         <div className="truncate max-w-[190px]">
-                          {room.currentCourse || 'Open for scheduling'}
+                          {room.currentCourse || 'Open for booking requests'}
                         </div>
                         {room.timeSlot && (
                           <div className="font-mono text-slate-400">{room.timeSlot}</div>
@@ -321,22 +336,16 @@ export function OverviewView({
                         {room.micBattery}%
                       </td>
                       <td className="py-3 px-6 text-right">
-                        {room.status === 'Available' ? (
+                        {!room.blocked && room.status !== 'Maintenance' ? (
                           <button
                             type="button"
                             onClick={() => onOpenBookingModal(room)}
                             className="text-xs font-semibold text-blue-700 dark:text-blue-400 hover:underline whitespace-nowrap"
                           >
-                            Book
+                            Request
                           </button>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => onNavigate('rooms')}
-                            className="text-xs font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white whitespace-nowrap"
-                          >
-                            Inspect
-                          </button>
+                          <span className="text-xs text-slate-400">Blocked</span>
                         )}
                       </td>
                     </tr>
@@ -347,7 +356,7 @@ export function OverviewView({
           </section>
         </div>
 
-        {/* Right: Attention Queue + Recent Bookings */}
+        {/* Right: Attention Queue + My Recent Bookings */}
         <div className="lg:col-span-5 space-y-6">
           <section className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 space-y-4">
             <div className="flex items-center justify-between">
@@ -356,7 +365,7 @@ export function OverviewView({
                   AV &amp; Emergency Attention Queue
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Rooms with active incidents or low audio readiness
+                  Venues with active incidents or low audio readiness
                 </p>
               </div>
               <button
@@ -422,7 +431,7 @@ export function OverviewView({
                       onClick={() => onNavigate('av')}
                       className="text-xs font-semibold text-blue-700 dark:text-blue-400 hover:underline whitespace-nowrap shrink-0"
                     >
-                      Service
+                      Inspect
                     </button>
                   </div>
                 ))}
@@ -434,10 +443,10 @@ export function OverviewView({
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                  Recent Reservations &amp; Activity
+                  My Recent Bookings
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Latest classroom bookings and cancellations
+                  Latest venue requests and approval status
                 </p>
               </div>
               <button
@@ -445,22 +454,22 @@ export function OverviewView({
                 onClick={() => onNavigate('bookings')}
                 className="text-xs font-semibold text-blue-700 dark:text-blue-400 hover:underline whitespace-nowrap shrink-0"
               >
-                View All
+                My Bookings
               </button>
             </div>
 
             {recentBookings.length === 0 ? (
               <div className="py-8 text-center space-y-3 border-t border-slate-100 dark:border-slate-800">
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  No reservations logged yet. Schedule your first lecture or seminar room.
+                  No booking requests yet. Request your first UCC venue.
                 </p>
                 <button
                   type="button"
                   onClick={() => onOpenBookingModal()}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-lg transition-colors whitespace-nowrap"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-[#0B2D5B] hover:bg-blue-900 rounded-lg transition-colors whitespace-nowrap"
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  <span>Book First Classroom</span>
+                  <span>Request Venue</span>
                 </button>
               </div>
             ) : (
@@ -478,10 +487,10 @@ export function OverviewView({
                         </span>
                       </div>
                       <p className="text-xs text-slate-600 dark:text-slate-400 truncate">
-                        {b.ownerName} · {b.date} ({b.startTime}–{b.endTime})
+                        {b.date} ({b.startTime}–{b.endTime})
                       </p>
                     </div>
-                    <StatusLabel status={b.status} />
+                    <BookingStatusBadge status={b.status} />
                   </div>
                 ))}
               </div>

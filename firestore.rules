@@ -7,7 +7,6 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Reusable hardened helpers
     function incoming() {
       return request.resource.data;
     }
@@ -27,8 +26,18 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         (request.auth.token.email == 's88806135@gmail.com' && request.auth.token.email_verified == true) ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        (request.auth.token.email == 'admin@ucc.edu.gh') ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        )
       );
+    }
+
+    function isNotDisabled() {
+      return !exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.disabled != true;
     }
 
     function isValidId(id) {
@@ -36,28 +45,32 @@ service cloud.firestore {
     }
 
     function isValidUserProfile(data) {
-      return data.keys().hasAll(['uid', 'fullName', 'email', 'uccId', 'department', 'campusRole', 'phone', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['uid', 'fullName', 'email', 'uccId', 'department', 'campusRole', 'phone', 'createdAt', 'updatedAt'])
+      return data.keys().hasAll(['uid', 'fullName', 'email', 'uccId', 'department', 'role', 'campusRole', 'phone', 'disabled', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'fullName', 'email', 'uccId', 'department', 'role', 'campusRole', 'phone', 'disabled', 'createdAt', 'updatedAt'])
         && isValidId(data.uid)
         && data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 100
         && data.email is string && data.email.size() >= 3 && data.email.size() <= 150
         && data.uccId is string && data.uccId.size() >= 3 && data.uccId.size() <= 32 && data.uccId.matches('^[a-zA-Z0-9/_\\-]+$')
         && data.department is string && data.department.size() >= 2 && data.department.size() <= 100
-        && data.campusRole in ['Lecturer', 'Class Representative', 'AV Technician', 'Department Coordinator', 'Student']
+        && data.role in ['student', 'lecturer', 'admin']
+        && data.campusRole in ['Lecturer', 'Class Representative', 'AV Technician', 'Department Coordinator', 'Student', 'Administrator']
         && data.phone is string && data.phone.size() <= 24
+        && data.disabled is bool
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
 
-    function isValidRoom(data) {
-      return data.keys().hasAll(['code', 'name', 'building', 'campusZone', 'capacity', 'status', 'currentCourse', 'currentLecturer', 'timeSlot', 'micStatus', 'micBattery', 'speakerStatus', 'projectorReady', 'updatedBy', 'updatedAt'])
-        && data.keys().hasOnly(['code', 'name', 'building', 'campusZone', 'capacity', 'status', 'currentCourse', 'currentLecturer', 'timeSlot', 'micStatus', 'micBattery', 'speakerStatus', 'projectorReady', 'updatedBy', 'updatedAt'])
+    function isValidVenue(data) {
+      return data.keys().hasAll(['code', 'name', 'building', 'campusZone', 'capacity', 'status', 'blocked', 'maintenanceNote', 'currentCourse', 'currentLecturer', 'timeSlot', 'micStatus', 'micBattery', 'speakerStatus', 'projectorReady', 'updatedBy', 'updatedAt'])
+        && data.keys().hasOnly(['code', 'name', 'building', 'campusZone', 'capacity', 'status', 'blocked', 'maintenanceNote', 'currentCourse', 'currentLecturer', 'timeSlot', 'micStatus', 'micBattery', 'speakerStatus', 'projectorReady', 'updatedBy', 'updatedAt'])
         && data.code is string && data.code.size() >= 2 && data.code.size() <= 24
         && data.name is string && data.name.size() >= 2 && data.name.size() <= 100
         && data.building is string && data.building.size() >= 2 && data.building.size() <= 80
         && data.campusZone in ['New Site', 'Old Site', 'Science', 'School of Business', 'Library Complex']
         && data.capacity is int && data.capacity >= 5 && data.capacity <= 2000
-        && data.status in ['Available', 'Occupied', 'Reserved', 'Cancelled', 'Emergency']
+        && data.status in ['Available', 'Occupied', 'Reserved', 'Maintenance', 'Emergency']
+        && data.blocked is bool
+        && data.maintenanceNote is string && data.maintenanceNote.size() <= 200
         && data.currentCourse is string && data.currentCourse.size() <= 120
         && data.currentLecturer is string && data.currentLecturer.size() <= 80
         && data.timeSlot is string && data.timeSlot.size() <= 60
@@ -70,8 +83,8 @@ service cloud.firestore {
     }
 
     function isValidBooking(data) {
-      return data.keys().hasAll(['roomId', 'roomCode', 'roomName', 'courseCode', 'courseTitle', 'date', 'startTime', 'endTime', 'attendeesCount', 'status', 'cancellationReason', 'cancelledByName', 'ownerId', 'ownerName', 'ownerDepartment', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['roomId', 'roomCode', 'roomName', 'courseCode', 'courseTitle', 'date', 'startTime', 'endTime', 'attendeesCount', 'status', 'cancellationReason', 'cancelledByName', 'ownerId', 'ownerName', 'ownerDepartment', 'createdAt', 'updatedAt'])
+      return data.keys().hasAll(['roomId', 'roomCode', 'roomName', 'courseCode', 'courseTitle', 'date', 'startTime', 'endTime', 'attendeesCount', 'status', 'requestedBy', 'requestedAt', 'reviewedBy', 'reviewedByName', 'reviewedAt', 'reason', 'cancelledByName', 'ownerId', 'ownerName', 'ownerDepartment', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['roomId', 'roomCode', 'roomName', 'courseCode', 'courseTitle', 'date', 'startTime', 'endTime', 'attendeesCount', 'status', 'requestedBy', 'requestedAt', 'reviewedBy', 'reviewedByName', 'reviewedAt', 'reason', 'cancelledByName', 'ownerId', 'ownerName', 'ownerDepartment', 'createdAt', 'updatedAt'])
         && isValidId(data.roomId) && data.roomId.size() <= 64
         && data.roomCode is string && data.roomCode.size() >= 2 && data.roomCode.size() <= 24
         && data.roomName is string && data.roomName.size() >= 2 && data.roomName.size() <= 100
@@ -81,13 +94,34 @@ service cloud.firestore {
         && data.startTime is string && data.startTime.size() >= 4 && data.startTime.size() <= 10
         && data.endTime is string && data.endTime.size() >= 4 && data.endTime.size() <= 10
         && data.attendeesCount is int && data.attendeesCount >= 1 && data.attendeesCount <= 2000
-        && data.status in ['Reserved', 'Occupied', 'Cancelled', 'Completed']
-        && data.cancellationReason is string && data.cancellationReason.size() <= 240
+        && data.status in ['pending', 'approved', 'rejected', 'cancelled']
+        && isValidId(data.requestedBy)
+        && data.requestedAt is timestamp
+        && data.reviewedBy is string && data.reviewedBy.size() <= 128
+        && data.reviewedByName is string && data.reviewedByName.size() <= 80
+        && (data.reviewedAt == null || data.reviewedAt is timestamp)
+        && data.reason is string && data.reason.size() <= 240
         && data.cancelledByName is string && data.cancelledByName.size() <= 80
         && isValidId(data.ownerId)
         && data.ownerName is string && data.ownerName.size() >= 2 && data.ownerName.size() <= 80
         && data.ownerDepartment is string && data.ownerDepartment.size() >= 2 && data.ownerDepartment.size() <= 100
         && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidVenueSchedule(data) {
+      return data.keys().hasAll(['venueId', 'venueCode', 'venueName', 'courseCode', 'courseTitle', 'date', 'startTime', 'endTime', 'status', 'requestedBy', 'updatedAt'])
+        && data.keys().hasOnly(['venueId', 'venueCode', 'venueName', 'courseCode', 'courseTitle', 'date', 'startTime', 'endTime', 'status', 'requestedBy', 'updatedAt'])
+        && isValidId(data.venueId) && data.venueId.size() <= 64
+        && data.venueCode is string && data.venueCode.size() >= 2 && data.venueCode.size() <= 24
+        && data.venueName is string && data.venueName.size() >= 2 && data.venueName.size() <= 100
+        && data.courseCode is string && data.courseCode.size() >= 2 && data.courseCode.size() <= 24
+        && data.courseTitle is string && data.courseTitle.size() >= 2 && data.courseTitle.size() <= 120
+        && data.date is string && data.date.size() >= 8 && data.date.size() <= 20
+        && data.startTime is string && data.startTime.size() >= 4 && data.startTime.size() <= 10
+        && data.endTime is string && data.endTime.size() >= 4 && data.endTime.size() <= 10
+        && data.status in ['approved', 'cancelled']
+        && isValidId(data.requestedBy)
         && data.updatedAt is timestamp;
     }
 
@@ -120,6 +154,18 @@ service cloud.firestore {
         && data.createdAt is timestamp;
     }
 
+    function isValidActivityLog(data) {
+      return data.keys().hasAll(['action', 'target', 'details', 'actorId', 'actorName', 'actorRole', 'createdAt'])
+        && data.keys().hasOnly(['action', 'target', 'details', 'actorId', 'actorName', 'actorRole', 'createdAt'])
+        && data.action is string && data.action.size() >= 2 && data.action.size() <= 80
+        && data.target is string && data.target.size() >= 1 && data.target.size() <= 120
+        && data.details is string && data.details.size() <= 280
+        && isValidId(data.actorId)
+        && data.actorName is string && data.actorName.size() >= 2 && data.actorName.size() <= 80
+        && data.actorRole in ['student', 'lecturer', 'admin']
+        && data.createdAt is timestamp;
+    }
+
     // Admins registry (never client-writable)
     match /admins/{adminId} {
       allow get: if isSignedIn() && isValidId(adminId) && (isOwner(adminId) || isAdmin());
@@ -127,7 +173,7 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Users collection (Strict PII isolation)
+    // Users collection: read if owner or admin; create defaults to student (admin only for admin@ucc.edu.gh)
     match /users/{userId} {
       allow get: if isSignedIn() && isValidId(userId) && (isOwner(userId) || isAdmin());
       allow list: if isAdmin();
@@ -135,83 +181,113 @@ service cloud.firestore {
         && isValidId(userId)
         && isValidUserProfile(incoming())
         && incoming().uid == request.auth.uid
+        && incoming().disabled == false
         && incoming().createdAt == request.time
-        && incoming().updatedAt == request.time;
+        && incoming().updatedAt == request.time
+        && (
+          incoming().role == 'student' ||
+          (incoming().role == 'lecturer') ||
+          (incoming().role == 'admin' && request.auth.token.email == 'admin@ucc.edu.gh')
+        );
       allow update: if isSignedIn()
         && isValidId(userId)
         && isValidUserProfile(incoming())
-        && (isOwner(userId) || isAdmin())
         && incoming().uid == existing().uid
         && incoming().email == existing().email
         && incoming().createdAt == existing().createdAt
         && incoming().updatedAt == request.time
         && (
-          isAdmin() ||
-          incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'uccId', 'department', 'campusRole', 'phone', 'updatedAt'])
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'uccId', 'department', 'role', 'campusRole', 'phone', 'disabled', 'updatedAt'])) ||
+          (isOwner(userId) && incoming().role == existing().role && incoming().disabled == existing().disabled && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'uccId', 'department', 'campusRole', 'phone', 'updatedAt']))
         );
       allow delete: if isAdmin() && isValidId(userId);
     }
 
-    // Classrooms & AV readiness
-    match /rooms/{roomId} {
-      allow get: if isSignedIn() && isValidId(roomId);
-      allow list: if isSignedIn() && resource.data.status in ['Available', 'Occupied', 'Reserved', 'Cancelled', 'Emergency'];
-      allow create: if isSignedIn()
-        && isValidId(roomId)
-        && isValidRoom(incoming())
+    // Venues collection: all signed-in users can read, ONLY admin can write
+    match /venues/{venueId} {
+      allow get: if isSignedIn() && isValidId(venueId);
+      allow list: if isSignedIn() && resource.data.status in ['Available', 'Occupied', 'Reserved', 'Maintenance', 'Emergency'];
+      allow create: if isAdmin()
+        && isValidId(venueId)
+        && isValidVenue(incoming())
         && incoming().updatedBy == request.auth.uid
         && incoming().updatedAt == request.time;
-      allow update: if isSignedIn()
-        && isValidId(roomId)
-        && isValidRoom(incoming())
+      allow update: if isAdmin()
+        && isValidId(venueId)
+        && isValidVenue(incoming())
         && incoming().updatedBy == request.auth.uid
+        && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(venueId);
+    }
+
+    // Public sanitized approved schedule slots for campus availability calendar
+    match /venueSchedules/{scheduleId} {
+      allow get: if isSignedIn() && isValidId(scheduleId);
+      allow list: if isSignedIn() && resource.data.status in ['approved', 'cancelled'];
+      allow create: if isAdmin()
+        && isValidId(scheduleId)
+        && isValidVenueSchedule(incoming())
+        && incoming().status == 'approved'
+        && incoming().updatedAt == request.time;
+      allow update: if isSignedIn()
+        && isValidId(scheduleId)
+        && isValidVenueSchedule(incoming())
         && incoming().updatedAt == request.time
         && (
           isAdmin() ||
           (
-            incoming().code == existing().code &&
-            incoming().name == existing().name &&
-            incoming().building == existing().building &&
-            incoming().campusZone == existing().campusZone &&
-            incoming().capacity == existing().capacity &&
-            incoming().diff(existing()).affectedKeys().hasOnly([
-              'status', 'currentCourse', 'currentLecturer', 'timeSlot',
-              'micStatus', 'micBattery', 'speakerStatus', 'projectorReady',
-              'updatedBy', 'updatedAt'
-            ])
+            existing().requestedBy == request.auth.uid &&
+            incoming().status == 'cancelled' &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
           )
         );
-      allow delete: if isAdmin() && isValidId(roomId);
+      allow delete: if isAdmin() && isValidId(scheduleId);
     }
 
-    // Bookings & Cancellations
+    // Bookings: users read own, admin reads all; users create pending only, cancel own only; admin updates approved/rejected/cancelled
     match /bookings/{bookingId} {
-      allow get: if isSignedIn() && isValidId(bookingId);
-      allow list: if isSignedIn() && (
-        resource.data.ownerId == request.auth.uid ||
-        resource.data.status in ['Reserved', 'Occupied', 'Cancelled', 'Completed']
-      );
+      allow get: if isSignedIn() && isValidId(bookingId) && (existing().requestedBy == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.requestedBy == request.auth.uid || isAdmin());
       allow create: if isSignedIn()
+        && isNotDisabled()
         && isValidId(bookingId)
         && isValidBooking(incoming())
+        && incoming().status == 'pending'
+        && incoming().requestedBy == request.auth.uid
         && incoming().ownerId == request.auth.uid
+        && incoming().reviewedBy == ''
+        && incoming().reviewedByName == ''
+        && incoming().reviewedAt == null
+        && incoming().reason == ''
+        && incoming().cancelledByName == ''
+        && incoming().requestedAt == request.time
         && incoming().createdAt == request.time
         && incoming().updatedAt == request.time
-        && exists(/databases/$(database)/documents/rooms/$(incoming().roomId));
+        && exists(/databases/$(database)/documents/venues/$(incoming().roomId));
       allow update: if isSignedIn()
         && isValidId(bookingId)
         && isValidBooking(incoming())
+        && incoming().requestedBy == existing().requestedBy
         && incoming().ownerId == existing().ownerId
         && incoming().roomId == existing().roomId
+        && incoming().requestedAt == existing().requestedAt
         && incoming().createdAt == existing().createdAt
         && incoming().updatedAt == request.time
         && (
-          isAdmin() ||
           (
-            existing().status != 'Cancelled' &&
-            existing().status != 'Completed' &&
-            existing().ownerId == request.auth.uid &&
-            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'cancellationReason', 'cancelledByName', 'updatedAt'])
+            isAdmin() &&
+            incoming().status in ['approved', 'rejected', 'cancelled'] &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedByName', 'reviewedAt', 'reason', 'cancelledByName', 'updatedAt'])
+          ) ||
+          (
+            isNotDisabled() &&
+            existing().requestedBy == request.auth.uid &&
+            existing().status in ['pending', 'approved'] &&
+            incoming().status == 'cancelled' &&
+            incoming().reviewedBy == existing().reviewedBy &&
+            incoming().reviewedByName == existing().reviewedByName &&
+            incoming().reviewedAt == existing().reviewedAt &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'reason', 'cancelledByName', 'updatedAt'])
           )
         );
       allow delete: if isAdmin() && isValidId(bookingId);
@@ -225,12 +301,13 @@ service cloud.firestore {
         resource.data.status in ['Open', 'Dispatched', 'Resolved']
       );
       allow create: if isSignedIn()
+        && isNotDisabled()
         && isValidId(emergencyId)
         && isValidEmergency(incoming())
         && incoming().ownerId == request.auth.uid
         && incoming().createdAt == request.time
         && incoming().updatedAt == request.time
-        && exists(/databases/$(database)/documents/rooms/$(incoming().roomId));
+        && exists(/databases/$(database)/documents/venues/$(incoming().roomId));
       allow update: if isSignedIn()
         && isValidId(emergencyId)
         && isValidEmergency(incoming())
@@ -256,11 +333,24 @@ service cloud.firestore {
         resource.data.gearType in ['Microphone', 'Speaker', 'Soundbar']
       );
       allow create: if isSignedIn()
+        && isNotDisabled()
         && isValidId(logId)
         && isValidAvLog(incoming())
         && incoming().ownerId == request.auth.uid
         && incoming().createdAt == request.time
-        && exists(/databases/$(database)/documents/rooms/$(incoming().roomId));
+        && exists(/databases/$(database)/documents/venues/$(incoming().roomId));
+      allow update, delete: if false;
+    }
+
+    // System Activity Logs (Admin readable, authenticated append-only)
+    match /activityLogs/{logId} {
+      allow get: if isAdmin() && isValidId(logId);
+      allow list: if isAdmin();
+      allow create: if isSignedIn()
+        && isValidId(logId)
+        && isValidActivityLog(incoming())
+        && incoming().actorId == request.auth.uid
+        && incoming().createdAt == request.time;
       allow update, delete: if false;
     }
   }
