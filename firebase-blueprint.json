@@ -1,0 +1,332 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Authenticated UCC CampusSpace member profile containing university identity, role, and contact details.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "fullName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 150
+        },
+        "uccId": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 32,
+          "pattern": "^[a-zA-Z0-9/_\\-]+$"
+        },
+        "department": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "campusRole": {
+          "type": "string",
+          "enum": ["Lecturer", "Class Representative", "AV Technician", "Department Coordinator", "Student"]
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "fullName", "email", "uccId", "department", "campusRole", "phone", "createdAt", "updatedAt"]
+    },
+    "Classroom": {
+      "title": "Classroom & Lecture Theatre",
+      "description": "University of Cape Coast classroom, lecture theatre, or lab with live occupancy and AV readiness state.",
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 24
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "building": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "campusZone": {
+          "type": "string",
+          "enum": ["New Site", "Old Site", "Science", "School of Business", "Library Complex"]
+        },
+        "capacity": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Available", "Occupied", "Reserved", "Cancelled", "Emergency"]
+        },
+        "currentCourse": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "currentLecturer": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "timeSlot": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "micStatus": {
+          "type": "string",
+          "enum": ["Ready", "Low Battery", "Charging", "Faulty", "None"]
+        },
+        "micBattery": {
+          "type": "integer"
+        },
+        "speakerStatus": {
+          "type": "string",
+          "enum": ["Operational", "Muted", "Faulty", "Maintenance"]
+        },
+        "projectorReady": {
+          "type": "boolean"
+        },
+        "updatedBy": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["code", "name", "building", "campusZone", "capacity", "status", "currentCourse", "currentLecturer", "timeSlot", "micStatus", "micBattery", "speakerStatus", "projectorReady", "updatedBy", "updatedAt"]
+    },
+    "Booking": {
+      "title": "Classroom Booking",
+      "description": "Classroom reservation, active lecture session, or cancelled booking record.",
+      "type": "object",
+      "properties": {
+        "roomId": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "roomCode": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 24
+        },
+        "roomName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "courseCode": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 24
+        },
+        "courseTitle": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "date": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 20
+        },
+        "startTime": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 10
+        },
+        "endTime": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 10
+        },
+        "attendeesCount": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Reserved", "Occupied", "Cancelled", "Completed"]
+        },
+        "cancellationReason": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "cancelledByName": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "ownerDepartment": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["roomId", "roomCode", "roomName", "courseCode", "courseTitle", "date", "startTime", "endTime", "attendeesCount", "status", "cancellationReason", "cancelledByName", "ownerId", "ownerName", "ownerDepartment", "createdAt", "updatedAt"]
+    },
+    "EmergencyRequest": {
+      "title": "Emergency Classroom & AV Dispatch",
+      "description": "Emergency classroom relocation request or critical AV hardware dispatch ticket.",
+      "type": "object",
+      "properties": {
+        "roomId": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "roomCode": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 24
+        },
+        "issueType": {
+          "type": "string",
+          "enum": ["Microphone / Audio Failure", "Projector / Power Outage", "Lecturer Relocation", "Room Conflict", "Emergency Standby"]
+        },
+        "urgency": {
+          "type": "string",
+          "enum": ["Critical", "High", "Standard"]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 400
+        },
+        "standbyRoomCode": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Open", "Dispatched", "Resolved"]
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["roomId", "roomCode", "issueType", "urgency", "description", "standbyRoomCode", "status", "ownerId", "ownerName", "createdAt", "updatedAt"]
+    },
+    "AvLog": {
+      "title": "AV Readiness Log",
+      "description": "Immutable maintenance log for microphone battery swaps and speaker diagnostic tests.",
+      "type": "object",
+      "properties": {
+        "roomId": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "roomCode": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 24
+        },
+        "gearType": {
+          "type": "string",
+          "enum": ["Microphone", "Speaker", "Soundbar"]
+        },
+        "action": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 120
+        },
+        "batteryAfter": {
+          "type": "integer"
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["roomId", "roomCode", "gearType", "action", "batteryAfter", "ownerId", "ownerName", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user account profile keyed by Firebase Auth UID."
+    },
+    "/rooms/{roomId}": {
+      "schema": { "$ref": "#/entities/Classroom" },
+      "description": "UCC campus classrooms, lecture theatres, and AV gear readiness state."
+    },
+    "/bookings/{bookingId}": {
+      "schema": { "$ref": "#/entities/Booking" },
+      "description": "Classroom bookings, live sessions, and cancellation records."
+    },
+    "/emergencies/{emergencyId}": {
+      "schema": { "$ref": "#/entities/EmergencyRequest" },
+      "description": "Emergency classroom relocation and AV hardware dispatch tickets."
+    },
+    "/avLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AvLog" },
+      "description": "Immutable audio gear maintenance and battery swap logs."
+    }
+  }
+}

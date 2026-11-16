@@ -1,0 +1,6 @@
+{
+  "name": "CampusSpace UCC - Classroom & AV Management",
+  "description": "University of Cape Coast classroom management system tracking room availability, occupied classes, reservations, cancellations, emergency requests, and AV gear readiness with user authentication.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
