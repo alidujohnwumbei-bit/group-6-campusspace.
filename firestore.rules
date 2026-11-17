@@ -23,10 +23,17 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isAutoAdminEmail() {
+      return isSignedIn() && (
+        request.auth.token.email == 'admin@ucc.edu.gh' ||
+        request.auth.token.email == 'alidujohnwumbei12@gmail.com'
+      );
+    }
+
     function isAdmin() {
       return isSignedIn() && (
         (request.auth.token.email == 's88806135@gmail.com' && request.auth.token.email_verified == true) ||
-        (request.auth.token.email == 'admin@ucc.edu.gh') ||
+        isAutoAdminEmail() ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
         (
           exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -53,7 +60,7 @@ service cloud.firestore {
         && data.uccId is string && data.uccId.size() >= 3 && data.uccId.size() <= 32 && data.uccId.matches('^[a-zA-Z0-9/_\\-]+$')
         && data.department is string && data.department.size() >= 2 && data.department.size() <= 100
         && data.role in ['student', 'lecturer', 'admin']
-        && data.campusRole in ['Lecturer', 'Class Representative', 'AV Technician', 'Department Coordinator', 'Student', 'Administrator']
+        && data.campusRole in ['Admin', 'Administrator', 'Student', 'Class Representative', 'Lecturer', 'AV Technician', 'Department Coordinator']
         && data.phone is string && data.phone.size() <= 24
         && data.disabled is bool
         && data.createdAt is timestamp
@@ -173,7 +180,7 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Users collection: read if owner or admin; create defaults to student (admin only for admin@ucc.edu.gh)
+    // Users collection: read if owner or admin; auto-admin allowed for designated admin emails
     match /users/{userId} {
       allow get: if isSignedIn() && isValidId(userId) && (isOwner(userId) || isAdmin());
       allow list: if isAdmin();
@@ -186,8 +193,8 @@ service cloud.firestore {
         && incoming().updatedAt == request.time
         && (
           incoming().role == 'student' ||
-          (incoming().role == 'lecturer') ||
-          (incoming().role == 'admin' && request.auth.token.email == 'admin@ucc.edu.gh')
+          incoming().role == 'lecturer' ||
+          (incoming().role == 'admin' && isAutoAdminEmail())
         );
       allow update: if isSignedIn()
         && isValidId(userId)

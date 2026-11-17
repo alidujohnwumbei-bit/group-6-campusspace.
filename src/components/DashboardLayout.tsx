@@ -15,6 +15,7 @@ import {
   UserCog,
   X,
 } from 'lucide-react';
+import { isAdminProfile } from '../services/campusService';
 import type { UserProfile } from '../types';
 import type { DashboardTab } from './OverviewView';
 
@@ -59,13 +60,13 @@ export function DashboardLayout({
 }: DashboardLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const navItems =
-    profile.role === 'admin'
-      ? [
-          ...BASE_NAV_ITEMS,
-          { id: 'admin' as DashboardTab, label: 'Admin Panel', icon: ShieldCheck },
-        ]
-      : BASE_NAV_ITEMS;
+  const isAdmin = isAdminProfile(profile);
+  const navItems = isAdmin
+    ? [
+        { id: 'admin' as DashboardTab, label: 'Admin Dashboard', icon: ShieldCheck },
+        ...BASE_NAV_ITEMS,
+      ]
+    : BASE_NAV_ITEMS;
 
   const currentLabel =
     navItems.find((item) => item.id === activeTab)?.label ?? 'Dashboard';

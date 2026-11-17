@@ -3,12 +3,13 @@ import type { Timestamp } from 'firebase/firestore';
 export type SystemRole = 'student' | 'lecturer' | 'admin';
 
 export type CampusRole =
+  | 'Admin'
+  | 'Administrator'
   | 'Lecturer'
   | 'Class Representative'
   | 'AV Technician'
   | 'Department Coordinator'
-  | 'Student'
-  | 'Administrator';
+  | 'Student';
 
 export type CampusZone =
   | 'New Site'
@@ -165,6 +166,7 @@ export const CAMPUS_ROLES: CampusRole[] = [
   'Lecturer',
   'AV Technician',
   'Department Coordinator',
+  'Admin',
 ];
 
 export const CAMPUS_ZONES: CampusZone[] = [

@@ -22,7 +22,12 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { auth, googleProvider } from '../firebase';
-import { createUserProfile, resolveDefaultRole, sanitizeUccId } from '../services/campusService';
+import {
+  createUserProfile,
+  isAutoAdminEmail,
+  resolveDefaultRole,
+  sanitizeUccId,
+} from '../services/campusService';
 import {
   CAMPUS_ROLES,
   UCC_DEPARTMENTS,
@@ -69,10 +74,13 @@ export function AuthPortal({
   const [emailProviderNotice, setEmailProviderNotice] = useState(false);
 
   function deriveSystemRole(email: string, selectedCampusRole: CampusRole): SystemRole {
-    if (email.trim().toLowerCase() === 'admin@ucc.edu.gh') return 'admin';
+    if (isAutoAdminEmail(email)) return 'admin';
     if (selectedCampusRole === 'Lecturer') return 'lecturer';
     return 'student';
   }
+
+  const regEmailIsAutoAdmin = isAutoAdminEmail(regEmail);
+  const googleEmailIsAutoAdmin = isAutoAdminEmail(pendingGoogleUser?.email);
 
   function mapAuthError(err: unknown): string {
     const code = (err as { code?: string })?.code ?? '';
@@ -152,18 +160,22 @@ export function AuthPortal({
       await updateProfile(credential.user, {
         displayName: fullName.trim(),
       });
+      const cleanEmail = regEmail.trim();
+      const forcedCampusRole: CampusRole = isAutoAdminEmail(cleanEmail)
+        ? 'Admin'
+        : campusRole;
       const systemRole = resolveDefaultRole(
-        regEmail.trim(),
-        deriveSystemRole(regEmail.trim(), campusRole)
+        cleanEmail,
+        deriveSystemRole(cleanEmail, forcedCampusRole)
       );
       const profile = await createUserProfile({
         uid: credential.user.uid,
         fullName: fullName.trim(),
-        email: regEmail.trim(),
+        email: cleanEmail,
         uccId: cleanedId,
         department,
         role: systemRole,
-        campusRole,
+        campusRole: forcedCampusRole,
         phone: phone.trim(),
       });
       onAuthComplete(profile);
@@ -191,10 +203,13 @@ export function AuthPortal({
 
     setSubmitting(true);
     try {
-      const userEmail = pendingGoogleUser.email ?? 'member@ucc.edu.gh';
+      const userEmail = (pendingGoogleUser.email ?? 'member@ucc.edu.gh').trim();
+      const forcedCampusRole: CampusRole = isAutoAdminEmail(userEmail)
+        ? 'Admin'
+        : campusRole;
       const systemRole = resolveDefaultRole(
         userEmail,
-        deriveSystemRole(userEmail, campusRole)
+        deriveSystemRole(userEmail, forcedCampusRole)
       );
       const profile = await createUserProfile({
         uid: pendingGoogleUser.uid,
@@ -203,7 +218,7 @@ export function AuthPortal({
         uccId: cleanedId,
         department,
         role: systemRole,
-        campusRole,
+        campusRole: forcedCampusRole,
         phone: phone.trim(),
       });
       onAuthComplete(profile);
@@ -366,7 +381,7 @@ export function AuthPortal({
                       Academic Role
                     </label>
                     <select
-                      value={campusRole}
+                      value={googleEmailIsAutoAdmin ? 'Admin' : campusRole}
                       onChange={(e) => setCampusRole(e.target.value as CampusRole)}
                       className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
                     >
@@ -378,6 +393,15 @@ export function AuthPortal({
                     </select>
                   </div>
                 </div>
+
+                {googleEmailIsAutoAdmin && (
+                  <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-xs text-amber-900 dark:text-amber-200 flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <span>
+                      Designated administrator email detected — Academic Role will automatically be set to <strong>Admin</strong>.
+                    </span>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
@@ -612,7 +636,7 @@ export function AuthPortal({
                         Academic Role
                       </label>
                       <select
-                        value={campusRole}
+                        value={regEmailIsAutoAdmin ? 'Admin' : campusRole}
                         onChange={(e) => setCampusRole(e.target.value as CampusRole)}
                         className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
                       >
@@ -637,6 +661,15 @@ export function AuthPortal({
                       />
                     </div>
                   </div>
+
+                  {regEmailIsAutoAdmin && (
+                    <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-xs text-amber-900 dark:text-amber-200 flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                      <span>
+                        Admin email detected — Academic Role will automatically be saved as <strong>Admin</strong>.
+                      </span>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">

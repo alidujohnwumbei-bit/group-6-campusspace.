@@ -37,7 +37,7 @@
         },
         "campusRole": {
           "type": "string",
-          "enum": ["Lecturer", "Class Representative", "AV Technician", "Department Coordinator", "Student", "Administrator"]
+          "enum": ["Admin", "Administrator", "Student", "Class Representative", "Lecturer", "AV Technician", "Department Coordinator"]
         },
         "phone": {
           "type": "string",

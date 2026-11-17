@@ -5,6 +5,8 @@ import { auth } from './firebase';
 import { INITIAL_UCC_ROOMS } from './data/seedRooms';
 import {
   getUserProfile,
+  hasFirestoreAdminAccess,
+  isAdminProfile,
   seedInitialVenuesIfEmpty,
   subscribeActivityLogs,
   subscribeAllBookings,
@@ -123,7 +125,7 @@ export default function App() {
   useEffect(() => {
     function handlePopState() {
       const next = readTabFromPathname();
-      if (next === 'admin' && profile && profile.role !== 'admin') {
+      if (next === 'admin' && profile && !isAdminProfile(profile)) {
         window.history.replaceState({}, '', '/');
         setActiveTab('overview');
         return;
@@ -136,7 +138,7 @@ export default function App() {
 
   function navigateTab(tab: DashboardTab) {
     if (tab === 'admin') {
-      if (profile?.role !== 'admin') {
+      if (!isAdminProfile(profile)) {
         if (window.location.pathname !== '/') {
           window.history.replaceState({}, '', '/');
         }
@@ -164,8 +166,11 @@ export default function App() {
 
       setProfileLoading(true);
       try {
-        const existingProfile = await getUserProfile(user.uid);
+        const existingProfile = await getUserProfile(user.uid, user.email);
         setProfile(existingProfile);
+        if (existingProfile && isAdminProfile(existingProfile)) {
+          setActiveTab('admin');
+        }
       } catch (err) {
         console.error('Failed to load user profile:', err);
         setProfile(null);
@@ -184,7 +189,7 @@ export default function App() {
     const onAdminPath =
       window.location.pathname.toLowerCase() === '/admin' ||
       window.location.pathname.toLowerCase().startsWith('/admin/');
-    if ((onAdminPath || activeTab === 'admin') && profile.role !== 'admin') {
+    if ((onAdminPath || activeTab === 'admin') && !isAdminProfile(profile)) {
       window.history.replaceState({}, '', '/');
       setActiveTab('overview');
     }
@@ -206,7 +211,9 @@ export default function App() {
     let cancelled = false;
     setDataLoading(true);
 
-    if (profile.role === 'admin') {
+    const canAccessAdminCollections = hasFirestoreAdminAccess(profile);
+
+    if (canAccessAdminCollections) {
       void seedInitialVenuesIfEmpty(firebaseUser.uid).catch((err) => {
         console.error('Venue seed check error:', err);
       });
@@ -234,7 +241,7 @@ export default function App() {
     let unsubAllBookings = () => {};
     let unsubAllUsers = () => {};
     let unsubActivity = () => {};
-    if (profile.role === 'admin') {
+    if (canAccessAdminCollections) {
       unsubAllBookings = subscribeAllBookings((data) => {
         if (!cancelled) setAllBookings(data);
       });
@@ -284,7 +291,10 @@ export default function App() {
           pendingGoogleUser={firebaseUser && !profile ? firebaseUser : null}
           onAuthComplete={(createdProfile) => {
             setProfile(createdProfile);
-            if (window.location.pathname === '/admin' && createdProfile.role !== 'admin') {
+            if (isAdminProfile(createdProfile)) {
+              window.history.replaceState({}, '', '/admin');
+              setActiveTab('admin');
+            } else if (window.location.pathname === '/admin') {
               window.history.replaceState({}, '', '/');
               setActiveTab('overview');
             }
@@ -328,10 +338,9 @@ export default function App() {
     : venues;
 
   const openEmergencyCount = emergencies.filter((e) => e.status !== 'Resolved').length;
-  const pendingAdminCount =
-    profile.role === 'admin'
-      ? allBookings.filter((b) => b.status === 'pending').length
-      : 0;
+  const pendingAdminCount = hasFirestoreAdminAccess(profile)
+    ? allBookings.filter((b) => b.status === 'pending').length
+    : 0;
 
   return (
     <AppErrorBoundary>
@@ -412,7 +421,7 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'admin' && profile.role === 'admin' && (
+        {activeTab === 'admin' && isAdminProfile(profile) && (
           <AdminDashboard
             profile={profile}
             venues={effectiveVenues}

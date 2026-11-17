@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { CheckCircle2, Loader2, LogOut, Save, ShieldCheck } from 'lucide-react';
-import { sanitizeUccId, updateUserProfile } from '../services/campusService';
+import { isAutoAdminEmail, sanitizeUccId, updateUserProfile } from '../services/campusService';
 import {
   CAMPUS_ROLES,
   UCC_DEPARTMENTS,
@@ -34,7 +34,9 @@ export function AccountView({
   const [loggingOut, setLoggingOut] = useState(false);
 
   const roleChoices: CampusRole[] =
-    profile.role === 'admin' ? ['Administrator', ...CAMPUS_ROLES] : CAMPUS_ROLES;
+    profile.campusRole === 'Administrator'
+      ? ['Administrator', ...CAMPUS_ROLES]
+      : CAMPUS_ROLES;
 
   async function handleSave(e: FormEvent) {
     e.preventDefault();
@@ -51,13 +53,17 @@ export function AccountView({
       return;
     }
 
+    const finalCampusRole: CampusRole = isAutoAdminEmail(profile.email)
+      ? 'Admin'
+      : campusRole;
+
     setSaving(true);
     try {
       await updateUserProfile(profile.uid, {
         fullName: fullName.trim(),
         uccId: cleanedId,
         department,
-        campusRole,
+        campusRole: finalCampusRole,
         phone: phone.trim(),
       });
       onProfileUpdated({
@@ -65,7 +71,7 @@ export function AccountView({
         fullName: fullName.trim(),
         uccId: cleanedId,
         department,
-        campusRole,
+        campusRole: finalCampusRole,
         phone: phone.trim(),
       });
       setSavedNotice(true);

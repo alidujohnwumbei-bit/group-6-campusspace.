@@ -67,34 +67,83 @@ export function isBookingInFuture(dateStr: string, startTime: string): boolean {
   return target.getTime() > now.getTime();
 }
 
+export const AUTO_ADMIN_EMAILS = [
+  'alidujohnwumbei12@gmail.com',
+  'admin@ucc.edu.gh',
+] as const;
+
+export function isAutoAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  const normalized = email.trim().toLowerCase();
+  return AUTO_ADMIN_EMAILS.includes(normalized as (typeof AUTO_ADMIN_EMAILS)[number]);
+}
+
+export function isAdminProfile(profile?: UserProfile | null): boolean {
+  if (!profile) return false;
+  return (
+    profile.role === 'admin' ||
+    profile.campusRole === 'Admin' ||
+    profile.campusRole === 'Administrator' ||
+    isAutoAdminEmail(profile.email)
+  );
+}
+
+export function hasFirestoreAdminAccess(profile?: UserProfile | null): boolean {
+  if (!profile) return false;
+  return profile.role === 'admin' || isAutoAdminEmail(profile.email);
+}
+
 export function resolveDefaultRole(email: string, requestedRole?: SystemRole): SystemRole {
-  if (email.trim().toLowerCase() === 'admin@ucc.edu.gh') {
+  if (isAutoAdminEmail(email)) {
     return 'admin';
   }
   if (requestedRole === 'lecturer') return 'lecturer';
   return 'student';
 }
 
-export async function getUserProfile(uid: string): Promise<UserProfile | null> {
+export async function getUserProfile(
+  uid: string,
+  authEmail?: string | null
+): Promise<UserProfile | null> {
   const path = `users/${uid}`;
   try {
     const snap = await getDoc(doc(db, 'users', uid));
     if (!snap.exists()) return null;
     const raw = snap.data() as Partial<UserProfile>;
-    const resolvedRole: SystemRole =
-      raw.role === 'admin' || raw.role === 'lecturer' || raw.role === 'student'
+    const effectiveEmail = authEmail ?? raw.email ?? '';
+    const autoAdmin = isAutoAdminEmail(effectiveEmail);
+
+    const resolvedRole: SystemRole = autoAdmin
+      ? 'admin'
+      : raw.role === 'admin' || raw.role === 'lecturer' || raw.role === 'student'
         ? raw.role
-        : raw.email?.toLowerCase() === 'admin@ucc.edu.gh'
-          ? 'admin'
-          : 'student';
+        : 'student';
+
+    const resolvedCampusRole: CampusRole = autoAdmin
+      ? 'Admin'
+      : raw.campusRole ?? 'Student';
+
+    // On login: if auto-admin email doesn't yet have role='admin' & campusRole='Admin' in Firestore, persist it immediately
+    if (autoAdmin && (raw.role !== 'admin' || raw.campusRole !== 'Admin')) {
+      try {
+        await updateDoc(doc(db, 'users', uid), {
+          role: 'admin',
+          campusRole: 'Admin',
+          updatedAt: serverTimestamp(),
+        });
+      } catch (err) {
+        console.error('Auto-admin promotion sync error:', err);
+      }
+    }
+
     return {
       uid: raw.uid ?? uid,
       fullName: raw.fullName ?? 'Campus User',
-      email: raw.email ?? '',
+      email: raw.email ?? effectiveEmail,
       uccId: raw.uccId ?? 'UCC-USER',
       department: raw.department ?? 'Computer Science & IT',
       role: resolvedRole,
-      campusRole: raw.campusRole ?? 'Student',
+      campusRole: resolvedCampusRole,
       phone: raw.phone ?? '',
       disabled: Boolean(raw.disabled),
       createdAt: raw.createdAt,
@@ -116,9 +165,9 @@ export async function createUserProfile(input: {
   phone: string;
 }): Promise<UserProfile> {
   const path = `users/${input.uid}`;
+  const autoAdmin = isAutoAdminEmail(input.email);
   const finalRole = resolveDefaultRole(input.email, input.role);
-  const finalCampusRole: CampusRole =
-    finalRole === 'admin' ? 'Administrator' : input.campusRole;
+  const finalCampusRole: CampusRole = autoAdmin ? 'Admin' : input.campusRole;
 
   const payload = {
     uid: input.uid,
@@ -136,7 +185,7 @@ export async function createUserProfile(input: {
 
   try {
     await setDoc(doc(db, 'users', input.uid), payload);
-    const created = await getUserProfile(input.uid);
+    const created = await getUserProfile(input.uid, input.email);
     if (!created) {
       throw new Error('Profile created but could not be reloaded.');
     }
@@ -552,7 +601,7 @@ export async function adminApproveBooking(
   adminProfile: UserProfile
 ): Promise<void> {
   const uid = auth.currentUser?.uid;
-  if (!uid || adminProfile.role !== 'admin') {
+  if (!uid || !hasFirestoreAdminAccess(adminProfile)) {
     throw new Error('Administrator privileges required.');
   }
 
@@ -609,7 +658,7 @@ export async function adminRejectBooking(
   reason: string
 ): Promise<void> {
   const uid = auth.currentUser?.uid;
-  if (!uid || adminProfile.role !== 'admin') {
+  if (!uid || !hasFirestoreAdminAccess(adminProfile)) {
     throw new Error('Administrator privileges required.');
   }
 
@@ -641,7 +690,7 @@ export async function adminForceCancelBooking(
   reason: string
 ): Promise<void> {
   const uid = auth.currentUser?.uid;
-  if (!uid || adminProfile.role !== 'admin') {
+  if (!uid || !hasFirestoreAdminAccess(adminProfile)) {
     throw new Error('Administrator privileges required.');
   }
 
@@ -697,12 +746,12 @@ export async function adminUpdateUser(
   updates: { role: SystemRole; disabled: boolean },
   adminProfile: UserProfile
 ): Promise<void> {
-  if (adminProfile.role !== 'admin') {
+  if (!hasFirestoreAdminAccess(adminProfile)) {
     throw new Error('Administrator privileges required.');
   }
   const campusRole: CampusRole =
     updates.role === 'admin'
-      ? 'Administrator'
+      ? 'Admin'
       : updates.role === 'lecturer'
         ? 'Lecturer'
         : 'Student';
@@ -745,7 +794,7 @@ export async function adminSaveVenue(
   adminProfile: UserProfile
 ): Promise<void> {
   const uid = auth.currentUser?.uid;
-  if (!uid || adminProfile.role !== 'admin') {
+  if (!uid || !hasFirestoreAdminAccess(adminProfile)) {
     throw new Error('Administrator privileges required.');
   }
 
@@ -810,7 +859,7 @@ export async function adminToggleVenueMaintenance(
   adminProfile: UserProfile
 ): Promise<void> {
   const uid = auth.currentUser?.uid;
-  if (!uid || adminProfile.role !== 'admin') {
+  if (!uid || !hasFirestoreAdminAccess(adminProfile)) {
     throw new Error('Administrator privileges required.');
   }
   try {
@@ -842,7 +891,7 @@ export async function adminDeleteVenue(
   venue: Classroom,
   adminProfile: UserProfile
 ): Promise<void> {
-  if (adminProfile.role !== 'admin') {
+  if (!hasFirestoreAdminAccess(adminProfile)) {
     throw new Error('Administrator privileges required.');
   }
   try {
@@ -863,7 +912,7 @@ export async function adminReleaseVenue(
   adminProfile: UserProfile
 ): Promise<void> {
   const uid = auth.currentUser?.uid;
-  if (!uid || adminProfile.role !== 'admin') {
+  if (!uid || !hasFirestoreAdminAccess(adminProfile)) {
     throw new Error('Administrator privileges required.');
   }
   try {

@@ -1,12 +1,14 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import {
   Activity,
+  AlertCircle,
   Ban,
   Building2,
   Calendar,
   CalendarCheck,
   Check,
   CheckCircle2,
+  Clock,
   Edit3,
   Loader2,
   Lock,
@@ -27,6 +29,7 @@ import {
   adminSaveVenue,
   adminToggleVenueMaintenance,
   adminUpdateUser,
+  hasFirestoreAdminAccess,
 } from '../services/campusService';
 import {
   CAMPUS_ZONES,
@@ -56,7 +59,7 @@ interface AdminDashboardProps {
   activityLogs: ActivityLog[];
 }
 
-type AdminSection = 'bookings' | 'users' | 'venues' | 'activity';
+type AdminSection = 'pending' | 'bookings' | 'users' | 'venues' | 'activity';
 
 const BOOKING_FILTERS: Array<'all' | BookingStatus> = [
   'all',
@@ -74,11 +77,12 @@ export function AdminDashboard({
   allUsers,
   activityLogs,
 }: AdminDashboardProps) {
-  const [section, setSection] = useState<AdminSection>('bookings');
+  const [section, setSection] = useState<AdminSection>('pending');
   const [bookingFilter, setBookingFilter] = useState<'all' | BookingStatus>('all');
   const [bookingSearch, setBookingSearch] = useState('');
   const [userSearch, setUserSearch] = useState('');
   const [venueSubView, setVenueSubView] = useState<'crud' | 'calendar'>('crud');
+  const canQueryAdminData = hasFirestoreAdminAccess(profile);
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
@@ -116,8 +120,12 @@ export function AdminDashboard({
 
   // Stats Calculations
   const todayStr = new Date().toISOString().slice(0, 10);
+  const pendingBookings = useMemo(
+    () => allBookings.filter((b) => b.status === 'pending'),
+    [allBookings]
+  );
   const totalBookings = allBookings.length;
-  const pendingRequests = allBookings.filter((b) => b.status === 'pending').length;
+  const pendingRequests = pendingBookings.length;
   const approvedToday = allBookings.filter((b) => {
     if (b.status !== 'approved') return false;
     const revDate = b.reviewedAt?.toDate ? b.reviewedAt.toDate().toISOString().slice(0, 10) : '';
@@ -374,27 +382,45 @@ export function AdminDashboard({
         <div className="space-y-1.5">
           <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
             <ShieldCheck className="h-4 w-4" />
-            <span>University of Cape Coast · Administrator Control Center (/admin)</span>
+            <span>
+              University of Cape Coast · Admin Console ({profile.fullName} · {profile.campusRole})
+            </span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight">
-            CampusSpace Governance &amp; Approvals
+            Admin Approval Queue &amp; Campus Control
           </h1>
           <p className="text-xs text-blue-100 max-w-2xl">
-            Review pending booking requests, manage student and lecturer permissions, maintain venue inventory, and audit campus activity.
+            Approve or reject pending venue requests, oversee all UCC room schedules, manage user roles, and maintain lecture hall inventory.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          <button
-            type="button"
-            onClick={openNewVenueModal}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg transition-colors whitespace-nowrap"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Add Venue</span>
-          </button>
+          {canQueryAdminData && (
+            <button
+              type="button"
+              onClick={openNewVenueModal}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg transition-colors whitespace-nowrap"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Venue</span>
+            </button>
+          )}
         </div>
       </section>
+
+      {!canQueryAdminData && (
+        <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-3">
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+          <div className="space-y-1">
+            <p className="font-semibold">
+              System Administrator Elevation Required for Global Records
+            </p>
+            <p>
+              Your Academic Role is set to <strong>{profile.campusRole}</strong>, while your Firestore security role is currently <strong>{profile.role}</strong>. Ask an existing Admin in User Management to grant <strong>admin</strong> access to unlock global approvals, user management, and venue writes.
+            </p>
+          </div>
+        </div>
+      )}
 
       {feedback && (
         <div
@@ -415,7 +441,7 @@ export function AdminDashboard({
         </div>
       )}
 
-      {/* 5 Admin Stats Cards */}
+      {/* Admin Stats Cards */}
       <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 space-y-1.5">
           <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
@@ -427,18 +453,18 @@ export function AdminDashboard({
         </div>
         <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 space-y-1.5">
           <div className="text-xs font-medium text-amber-700 dark:text-amber-400">
-            Pending Requests
+            Pending Count
           </div>
           <div className="text-2xl font-bold font-mono tabular-nums text-amber-700 dark:text-amber-300">
             {pendingRequests}
           </div>
         </div>
         <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 space-y-1.5">
-          <div className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-            Approved Today
+          <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            Total Rooms
           </div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-emerald-700 dark:text-emerald-300">
-            {approvedToday}
+          <div className="text-2xl font-bold font-mono tabular-nums text-slate-900 dark:text-white">
+            {totalVenues}
           </div>
         </div>
         <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 space-y-1.5">
@@ -450,11 +476,11 @@ export function AdminDashboard({
           </div>
         </div>
         <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 space-y-1.5">
-          <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
-            Total Venues
+          <div className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+            Approved Today
           </div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-slate-900 dark:text-white">
-            {totalVenues}
+          <div className="text-2xl font-bold font-mono tabular-nums text-emerald-700 dark:text-emerald-300">
+            {approvedToday}
           </div>
         </div>
       </section>
@@ -463,6 +489,7 @@ export function AdminDashboard({
       <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 w-fit">
         {(
           [
+            { id: 'pending', label: `Pending Venue Requests (${pendingBookings.length})`, icon: Clock },
             { id: 'bookings', label: `All Bookings (${allBookings.length})`, icon: CalendarCheck },
             { id: 'users', label: `User Management (${allUsers.length})`, icon: Users },
             { id: 'venues', label: `Venue Management (${venues.length})`, icon: Building2 },
@@ -487,6 +514,138 @@ export function AdminDashboard({
           );
         })}
       </div>
+
+      {/* SECTION 0: PENDING VENUE REQUESTS */}
+      {section === 'pending' && (
+        <section className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                Pending Venue Requests
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Requests waiting for administrator approval from the bookings collection
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSection('bookings')}
+              className="text-xs font-semibold text-[#0B2D5B] dark:text-amber-300 hover:underline whitespace-nowrap w-fit"
+            >
+              View All Booking Records &rarr;
+            </button>
+          </div>
+
+          {pendingBookings.length === 0 ? (
+            <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-10 text-center space-y-2">
+              <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400 mx-auto" />
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                No pending venue requests
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                Every venue reservation request has been reviewed. New requests submitted by students and lecturers will appear here automatically.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3.5">
+              {pendingBookings.map((b) => (
+                <div
+                  key={b.id}
+                  className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 flex-1 text-xs">
+                    <div className="space-y-1">
+                      <div className="text-slate-500 dark:text-slate-400 font-medium">
+                        Requester Name
+                      </div>
+                      <div className="font-bold text-slate-900 dark:text-white">
+                        {b.ownerName}
+                      </div>
+                      <div className="text-slate-500 dark:text-slate-400 truncate">
+                        {b.ownerDepartment}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="text-slate-500 dark:text-slate-400 font-medium">
+                        Room / Venue
+                      </div>
+                      <div className="font-mono font-bold text-slate-900 dark:text-white">
+                        {b.roomCode}
+                      </div>
+                      <div className="text-slate-500 dark:text-slate-400 truncate">
+                        {b.roomName}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="text-slate-500 dark:text-slate-400 font-medium">
+                        Date
+                      </div>
+                      <div className="font-mono font-semibold tabular-nums text-slate-900 dark:text-white">
+                        {b.date}
+                      </div>
+                      <div className="text-slate-500 dark:text-slate-400 font-mono tabular-nums">
+                        {b.attendeesCount} attendees
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="text-slate-500 dark:text-slate-400 font-medium">
+                        Time Slot
+                      </div>
+                      <div className="font-mono font-semibold tabular-nums text-slate-900 dark:text-white">
+                        {b.startTime} – {b.endTime}
+                      </div>
+                      <BookingStatusBadge status={b.status} />
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="text-slate-500 dark:text-slate-400 font-medium">
+                        Purpose / Course
+                      </div>
+                      <div className="font-mono font-semibold text-slate-900 dark:text-white">
+                        {b.courseCode}
+                      </div>
+                      <div className="text-slate-600 dark:text-slate-300">
+                        {b.courseTitle}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100 dark:border-slate-800">
+                    <button
+                      type="button"
+                      disabled={!canQueryAdminData || busyId === b.id}
+                      onClick={() => void handleApprove(b)}
+                      className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg transition-colors whitespace-nowrap"
+                    >
+                      {busyId === b.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Check className="h-3.5 w-3.5" />
+                      )}
+                      <span>APPROVE</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canQueryAdminData || busyId === b.id}
+                      onClick={() => {
+                        setReviewModal({ mode: 'reject', booking: b });
+                        setReviewReason('');
+                      }}
+                      className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg transition-colors whitespace-nowrap"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      <span>REJECT</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* SECTION 1: ALL BOOKINGS */}
       {section === 'bookings' && (
@@ -969,6 +1128,24 @@ export function AdminDashboard({
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                   {reviewModal.mode === 'reject' ? 'Rejection Reason (Required)' : 'Cancellation Reason'}
                 </label>
+                {reviewModal.mode === 'reject' && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {[
+                      'Venue already scheduled for academic exams.',
+                      'Classroom undergoing scheduled maintenance.',
+                      'Attendance exceeds safe hall capacity.',
+                    ].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setReviewReason(preset)}
+                        className="px-2 py-1 text-[11px] font-medium rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <textarea
                   rows={3}
                   required={reviewModal.mode === 'reject'}

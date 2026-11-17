@@ -8,6 +8,7 @@ import {
   Radio,
   ShieldCheck,
 } from 'lucide-react';
+import { isAdminProfile } from '../services/campusService';
 import {
   CAMPUS_ZONES,
   type Booking,
@@ -119,14 +120,14 @@ export function OverviewView({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 shrink-0">
-          {profile.role === 'admin' && (
+          {isAdminProfile(profile) && (
             <button
               type="button"
               onClick={() => onNavigate('admin')}
               className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors whitespace-nowrap shrink-0"
             >
               <ShieldCheck className="h-3.5 w-3.5" />
-              <span>Admin Panel</span>
+              <span>Admin Dashboard</span>
             </button>
           )}
           <button
