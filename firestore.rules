@@ -26,7 +26,8 @@ service cloud.firestore {
     function isAutoAdminEmail() {
       return isSignedIn() && (
         request.auth.token.email == 'admin@ucc.edu.gh' ||
-        request.auth.token.email == 'alidujohnwumbei12@gmail.com'
+        request.auth.token.email == 'alidujohnwumbei12@gmail.com' ||
+        request.auth.token.email == 'alidujohnwumbel12@gmail.com'
       );
     }
 
@@ -91,7 +92,7 @@ service cloud.firestore {
 
     function isValidBooking(data) {
       return data.keys().hasAll(['roomId', 'roomCode', 'roomName', 'courseCode', 'courseTitle', 'date', 'startTime', 'endTime', 'attendeesCount', 'status', 'requestedBy', 'requestedAt', 'reviewedBy', 'reviewedByName', 'reviewedAt', 'reason', 'cancelledByName', 'ownerId', 'ownerName', 'ownerDepartment', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['roomId', 'roomCode', 'roomName', 'courseCode', 'courseTitle', 'date', 'startTime', 'endTime', 'attendeesCount', 'status', 'requestedBy', 'requestedAt', 'reviewedBy', 'reviewedByName', 'reviewedAt', 'reason', 'cancelledByName', 'ownerId', 'ownerName', 'ownerDepartment', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['roomId', 'roomCode', 'roomName', 'courseCode', 'courseTitle', 'date', 'startTime', 'endTime', 'attendeesCount', 'status', 'requestedBy', 'requesterUid', 'requesterEmail', 'requestedAt', 'reviewedBy', 'reviewedByName', 'reviewedAt', 'reason', 'cancelledByName', 'ownerId', 'ownerName', 'ownerDepartment', 'createdAt', 'updatedAt'])
         && isValidId(data.roomId) && data.roomId.size() <= 64
         && data.roomCode is string && data.roomCode.size() >= 2 && data.roomCode.size() <= 24
         && data.roomName is string && data.roomName.size() >= 2 && data.roomName.size() <= 100
@@ -103,6 +104,8 @@ service cloud.firestore {
         && data.attendeesCount is int && data.attendeesCount >= 1 && data.attendeesCount <= 2000
         && data.status in ['pending', 'approved', 'rejected', 'cancelled']
         && isValidId(data.requestedBy)
+        && (!('requesterUid' in data) || isValidId(data.requesterUid))
+        && (!('requesterEmail' in data) || (data.requesterEmail is string && data.requesterEmail.size() <= 150))
         && data.requestedAt is timestamp
         && data.reviewedBy is string && data.reviewedBy.size() <= 128
         && data.reviewedByName is string && data.reviewedByName.size() <= 80
@@ -251,10 +254,11 @@ service cloud.firestore {
       allow delete: if isAdmin() && isValidId(scheduleId);
     }
 
-    // Bookings: users read own, admin reads all; users create pending only, cancel own only; admin updates approved/rejected/cancelled
+    // Bookings: any authenticated user can read all bookings and create pending bookings;
+    // users can cancel own bookings; only admin can approve/reject/force-cancel or delete.
     match /bookings/{bookingId} {
-      allow get: if isSignedIn() && isValidId(bookingId) && (existing().requestedBy == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (resource.data.requestedBy == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && isValidId(bookingId);
+      allow list: if isSignedIn();
       allow create: if isSignedIn()
         && isNotDisabled()
         && isValidId(bookingId)
@@ -262,6 +266,7 @@ service cloud.firestore {
         && incoming().status == 'pending'
         && incoming().requestedBy == request.auth.uid
         && incoming().ownerId == request.auth.uid
+        && (!('requesterUid' in incoming()) || incoming().requesterUid == request.auth.uid)
         && incoming().reviewedBy == ''
         && incoming().reviewedByName == ''
         && incoming().reviewedAt == null
@@ -269,8 +274,7 @@ service cloud.firestore {
         && incoming().cancelledByName == ''
         && incoming().requestedAt == request.time
         && incoming().createdAt == request.time
-        && incoming().updatedAt == request.time
-        && exists(/databases/$(database)/documents/venues/$(incoming().roomId));
+        && incoming().updatedAt == request.time;
       allow update: if isSignedIn()
         && isValidId(bookingId)
         && isValidBooking(incoming())
@@ -300,6 +304,32 @@ service cloud.firestore {
       allow delete: if isAdmin() && isValidId(bookingId);
     }
 
+    // Additional operational collections: any authenticated user can create & read; admin approves/deletes
+    match /venueRequests/{requestId} {
+      allow get: if isSignedIn() && isValidId(requestId);
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isNotDisabled() && isValidId(requestId)
+        && incoming().status == 'pending';
+      allow update: if isAdmin() && isValidId(requestId);
+      allow delete: if isAdmin() && isValidId(requestId);
+    }
+
+    match /emergencyDispatch/{dispatchId} {
+      allow get: if isSignedIn() && isValidId(dispatchId);
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isNotDisabled() && isValidId(dispatchId);
+      allow update: if isAdmin() && isValidId(dispatchId);
+      allow delete: if isAdmin() && isValidId(dispatchId);
+    }
+
+    match /incidents/{incidentId} {
+      allow get: if isSignedIn() && isValidId(incidentId);
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isNotDisabled() && isValidId(incidentId);
+      allow update: if isAdmin() && isValidId(incidentId);
+      allow delete: if isAdmin() && isValidId(incidentId);
+    }
+
     // Emergency Classroom & AV Dispatches
     match /emergencies/{emergencyId} {
       allow get: if isSignedIn() && isValidId(emergencyId);
@@ -313,8 +343,7 @@ service cloud.firestore {
         && isValidEmergency(incoming())
         && incoming().ownerId == request.auth.uid
         && incoming().createdAt == request.time
-        && incoming().updatedAt == request.time
-        && exists(/databases/$(database)/documents/venues/$(incoming().roomId));
+        && incoming().updatedAt == request.time;
       allow update: if isSignedIn()
         && isValidId(emergencyId)
         && isValidEmergency(incoming())
@@ -344,8 +373,7 @@ service cloud.firestore {
         && isValidId(logId)
         && isValidAvLog(incoming())
         && incoming().ownerId == request.auth.uid
-        && incoming().createdAt == request.time
-        && exists(/databases/$(database)/documents/venues/$(incoming().roomId));
+        && incoming().createdAt == request.time;
       allow update, delete: if false;
     }
 

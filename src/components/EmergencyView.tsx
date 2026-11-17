@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, ShieldAlert } from 'lucide-react';
+import { formatUserError } from '../firebase';
 import { resolveEmergencyDispatch, submitEmergencyDispatch } from '../services/campusService';
 import {
   VALIDATION_LIMITS,
@@ -62,7 +63,7 @@ export function EmergencyView({ rooms, emergencies, profile }: EmergencyViewProp
       setDescription('');
       setStandbyId('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to submit emergency dispatch.');
+      setError(formatUserError(err, 'Unable to submit emergency dispatch. Please try again.'));
     } finally {
       setSubmitting(false);
     }
@@ -74,7 +75,7 @@ export function EmergencyView({ rooms, emergencies, profile }: EmergencyViewProp
     try {
       await resolveEmergencyDispatch(em, profile, true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to resolve emergency.');
+      setError(formatUserError(err, 'Unable to resolve emergency. Please try again.'));
     } finally {
       setResolvingId(null);
     }

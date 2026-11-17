@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { CheckCircle2, Loader2, LogOut, Save, ShieldCheck } from 'lucide-react';
+import { formatUserError } from '../firebase';
 import { isAutoAdminEmail, sanitizeUccId, updateUserProfile } from '../services/campusService';
 import {
   CAMPUS_ROLES,
@@ -76,7 +77,7 @@ export function AccountView({
       });
       setSavedNotice(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to update profile.');
+      setError(formatUserError(err, 'Unable to update profile. Please try again.'));
     } finally {
       setSaving(false);
     }

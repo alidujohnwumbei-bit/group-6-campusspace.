@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { BatteryCharging, Loader2, Mic, Volume2 } from 'lucide-react';
+import { formatUserError } from '../firebase';
 import { updateRoomAvAndLog } from '../services/campusService';
 import type { AvLog, Classroom, SpeakerStatus, UserProfile } from '../types';
 import { StatusLabel } from './StatusLabel';
@@ -30,7 +31,7 @@ export function AvGearView({ rooms, avLogs, profile }: AvGearViewProps) {
         micBattery: 100,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to log battery swap.');
+      setError(formatUserError(err, 'Unable to log battery swap. Please try again.'));
     } finally {
       setBusyRoomId(null);
     }
@@ -51,7 +52,7 @@ export function AvGearView({ rooms, avLogs, profile }: AvGearViewProps) {
         speakerStatus: nextSpeaker,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to update speaker status.');
+      setError(formatUserError(err, 'Unable to update speaker status. Please try again.'));
     } finally {
       setBusyRoomId(null);
     }

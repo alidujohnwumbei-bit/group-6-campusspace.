@@ -21,6 +21,7 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
+import { formatUserError } from '../firebase';
 import {
   adminApproveBooking,
   adminDeleteVenue,
@@ -173,7 +174,7 @@ export function AdminDashboard({
     } catch (err) {
       setFeedback({
         type: 'err',
-        text: err instanceof Error ? err.message : 'Approval failed.',
+        text: formatUserError(err, 'Approval failed. Please try again.'),
       });
     } finally {
       setBusyId(null);
@@ -213,7 +214,7 @@ export function AdminDashboard({
     } catch (err) {
       setFeedback({
         type: 'err',
-        text: err instanceof Error ? err.message : 'Action failed.',
+        text: formatUserError(err, 'Action failed. Please try again.'),
       });
     } finally {
       setBusyId(null);
@@ -236,7 +237,7 @@ export function AdminDashboard({
     } catch (err) {
       setFeedback({
         type: 'err',
-        text: err instanceof Error ? err.message : 'Unable to update user.',
+        text: formatUserError(err, 'Unable to update user. Please try again.'),
       });
     } finally {
       setBusyId(null);
@@ -311,7 +312,7 @@ export function AdminDashboard({
     } catch (err) {
       setFeedback({
         type: 'err',
-        text: err instanceof Error ? err.message : 'Unable to save venue.',
+        text: formatUserError(err, 'Unable to save venue. Please try again.'),
       });
     } finally {
       setBusyId(null);
@@ -334,7 +335,7 @@ export function AdminDashboard({
     } catch (err) {
       setFeedback({
         type: 'err',
-        text: err instanceof Error ? err.message : 'Unable to block venue.',
+        text: formatUserError(err, 'Unable to block venue. Please try again.'),
       });
     } finally {
       setBusyId(null);
@@ -350,7 +351,7 @@ export function AdminDashboard({
     } catch (err) {
       setFeedback({
         type: 'err',
-        text: err instanceof Error ? err.message : 'Unable to unblock venue.',
+        text: formatUserError(err, 'Unable to unblock venue. Please try again.'),
       });
     } finally {
       setBusyId(null);
@@ -368,7 +369,7 @@ export function AdminDashboard({
     } catch (err) {
       setFeedback({
         type: 'err',
-        text: err instanceof Error ? err.message : 'Unable to delete venue.',
+        text: formatUserError(err, 'Unable to delete venue. Please try again.'),
       });
     } finally {
       setBusyId(null);

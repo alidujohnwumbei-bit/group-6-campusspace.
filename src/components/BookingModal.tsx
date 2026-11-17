@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Info, Loader2, X } from 'lucide-react';
+import { formatUserError } from '../firebase';
 import { createBookingRequest } from '../services/campusService';
 import { VALIDATION_LIMITS, type Classroom, type UserProfile } from '../types';
 
@@ -86,7 +87,7 @@ export function BookingModal({
       onBooked();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to submit booking request.');
+      setError(formatUserError(err, 'Unable to submit booking request. Please try again.'));
     } finally {
       setSaving(false);
     }

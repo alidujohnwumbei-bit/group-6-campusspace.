@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Loader2, Plus, X, XCircle } from 'lucide-react';
+import { formatUserError } from '../firebase';
 import { cancelOwnBooking, isBookingInFuture } from '../services/campusService';
 import { VALIDATION_LIMITS, type Booking, type BookingStatus, type UserProfile } from '../types';
 import { BookingStatusBadge } from './StatusLabel';
@@ -45,7 +46,7 @@ export function BookingsView({ bookings, profile, onNewBooking }: BookingsViewPr
       setCancelTarget(null);
       setCancelReason('');
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Unable to cancel booking.');
+      setActionError(formatUserError(err, 'Unable to cancel booking. Please try again.'));
     } finally {
       setBusyId(null);
     }

@@ -1,4 +1,5 @@
 import {
+  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -69,6 +70,7 @@ export function isBookingInFuture(dateStr: string, startTime: string): boolean {
 
 export const AUTO_ADMIN_EMAILS = [
   'alidujohnwumbei12@gmail.com',
+  'alidujohnwumbel12@gmail.com',
   'admin@ucc.edu.gh',
 ] as const;
 
@@ -499,9 +501,8 @@ export async function createBookingRequest(
     throw new Error(`${venue.code} is currently blocked for maintenance.`);
   }
 
-  const bookingRef = doc(collection(db, 'bookings'));
   try {
-    await setDoc(bookingRef, {
+    await addDoc(collection(db, 'bookings'), {
       roomId: venue.id,
       roomCode: venue.code,
       roomName: venue.name,
@@ -513,6 +514,11 @@ export async function createBookingRequest(
       attendeesCount: Math.max(1, Math.min(2000, Math.round(input.attendeesCount))),
       status: 'pending',
       requestedBy: uid,
+      requesterUid: uid,
+      requesterEmail: clampString(
+        auth.currentUser?.email ?? profile.email ?? '',
+        VALIDATION_LIMITS.emailMax
+      ),
       requestedAt: serverTimestamp(),
       reviewedBy: '',
       reviewedByName: '',
@@ -533,7 +539,7 @@ export async function createBookingRequest(
       profile,
     });
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, 'bookings');
+    handleFirestoreError(error, OperationType.CREATE, 'bookings');
   }
 }
 
