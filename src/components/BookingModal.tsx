@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { CheckCircle2, Info, Loader2, X } from 'lucide-react';
-import { createBookingRequest } from '../services/campusService';
+import { createBookingRequest, findBookingConflict } from '../services/campusService';
 import { VALIDATION_LIMITS, type Classroom, type UserProfile } from '../types';
 
 interface BookingModalProps {
@@ -76,6 +76,26 @@ export function BookingModal({
     setSaving(true);
     setError(null);
     setSuccessMsg(null);
+
+    try {
+      const conflict = await findBookingConflict({
+        roomId: selectedRoom.id,
+        roomCode: selectedRoom.code,
+        date,
+        startTime,
+        endTime,
+      });
+      if (conflict) {
+        setError(
+          `This room is already booked for that date and time. Please choose a different room or time. (Booked by ${conflict.ownerName} · ${conflict.startTime}–${conflict.endTime})`
+        );
+        setSaving(false);
+        return;
+      }
+    } catch {
+      // If conflict read fails due to offline state, continue to submit
+    }
+
     try {
       await createBookingRequest(selectedRoom, profile, {
         courseCode,

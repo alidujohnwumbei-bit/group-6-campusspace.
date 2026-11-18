@@ -1,4 +1,6 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db, formatUserError } from '../firebase';
 import {
   Activity,
   Ban,
@@ -20,7 +22,6 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
-import { formatUserError } from '../firebase';
 import {
   adminApproveBooking,
   adminDeleteVenue,
@@ -29,6 +30,8 @@ import {
   adminSaveVenue,
   adminToggleVenueMaintenance,
   adminUpdateUser,
+  findBookingConflict,
+  timesOverlap,
 } from '../services/campusService';
 import {
   CAMPUS_ZONES,
@@ -116,15 +119,91 @@ export function AdminDashboard({
   // Delete venue confirmation
   const [deleteTarget, setDeleteTarget] = useState<Classroom | null>(null);
 
+  const [directBookings, setDirectBookings] = useState<Booking[] | null>(null);
+  const [localFallbackBookings, setLocalFallbackBookings] = useState<Booking[]>([]);
+  const [showingLocalNotice, setShowingLocalNotice] = useState(false);
+
+  // Direct unfiltered Firestore query on collection(db, 'bookings') with localStorage fallback
+  useEffect(() => {
+    function readLocalBookings(): Booking[] {
+      const merged: Booking[] = [];
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (!key || !key.startsWith('campusspace_local_bookings_')) continue;
+          const raw = localStorage.getItem(key);
+          if (!raw) continue;
+          const parsed = JSON.parse(raw) as Partial<Booking>[];
+          for (const item of parsed) {
+            if (!item || !item.id) continue;
+            merged.push({
+              id: item.id,
+              roomId: item.roomId ?? '',
+              roomCode: item.roomCode ?? 'VENUE',
+              roomName: item.roomName ?? 'UCC Venue',
+              courseCode: item.courseCode ?? 'COURSE',
+              courseTitle: item.courseTitle ?? 'Pending Request',
+              date: item.date ?? '',
+              startTime: item.startTime ?? '',
+              endTime: item.endTime ?? '',
+              attendeesCount: item.attendeesCount ?? 1,
+              status: item.status ?? 'pending',
+              requestedBy: item.requestedBy ?? '',
+              reviewedBy: item.reviewedBy ?? '',
+              reviewedByName: item.reviewedByName ?? '',
+              reviewedAt: null,
+              reason: item.reason ?? '',
+              cancelledByName: item.cancelledByName ?? '',
+              ownerId: item.ownerId ?? '',
+              ownerName: item.ownerName ?? 'Student',
+              ownerDepartment: item.ownerDepartment ?? 'UCC',
+            });
+          }
+        }
+      } catch {
+        // Ignore localStorage parse issues
+      }
+      return merged;
+    }
+
+    const localItems = readLocalBookings();
+    setLocalFallbackBookings(localItems);
+
+    const unsub = onSnapshot(
+      collection(db, 'bookings'),
+      (snapshot) => {
+        const list = snapshot.docs
+          .map((d) => ({
+            id: d.id,
+            ...(d.data() as Omit<Booking, 'id'>),
+          }))
+          .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+        setDirectBookings(list);
+        setShowingLocalNotice(list.length === 0);
+      },
+      () => {
+        setDirectBookings([]);
+        setShowingLocalNotice(true);
+      }
+    );
+    return () => unsub();
+  }, []);
+
+  const effectiveBookings = useMemo(() => {
+    const remote = directBookings ?? allBookings;
+    if (remote.length > 0) return remote;
+    return localFallbackBookings;
+  }, [directBookings, allBookings, localFallbackBookings]);
+
   // Stats Calculations
   const todayStr = new Date().toISOString().slice(0, 10);
   const pendingBookings = useMemo(
-    () => allBookings.filter((b) => b.status === 'pending'),
-    [allBookings]
+    () => effectiveBookings.filter((b) => b.status === 'pending'),
+    [effectiveBookings]
   );
-  const totalBookings = allBookings.length;
+  const totalBookings = effectiveBookings.length;
   const pendingRequests = pendingBookings.length;
-  const approvedToday = allBookings.filter((b) => {
+  const approvedToday = effectiveBookings.filter((b) => {
     if (b.status !== 'approved') return false;
     const revDate = b.reviewedAt?.toDate ? b.reviewedAt.toDate().toISOString().slice(0, 10) : '';
     return revDate === todayStr || b.date === todayStr;
@@ -134,7 +213,7 @@ export function AdminDashboard({
 
   const filteredBookings = useMemo(() => {
     const q = bookingSearch.trim().toLowerCase();
-    return allBookings.filter((b) => {
+    return effectiveBookings.filter((b) => {
       if (bookingFilter !== 'all' && b.status !== bookingFilter) return false;
       if (!q) return true;
       return (
@@ -145,7 +224,7 @@ export function AdminDashboard({
         b.courseTitle.toLowerCase().includes(q)
       );
     });
-  }, [allBookings, bookingFilter, bookingSearch]);
+  }, [effectiveBookings, bookingFilter, bookingSearch]);
 
   const filteredUsers = useMemo(() => {
     const q = userSearch.trim().toLowerCase();
@@ -163,6 +242,36 @@ export function AdminDashboard({
     setBusyId(booking.id);
     setFeedback(null);
     try {
+      const localConflict = effectiveBookings.find(
+        (b) =>
+          b.id !== booking.id &&
+          b.status === 'approved' &&
+          (b.roomId === booking.roomId ||
+            b.roomCode.trim().toUpperCase() === booking.roomCode.trim().toUpperCase()) &&
+          b.date === booking.date &&
+          timesOverlap(booking.startTime, booking.endTime, b.startTime, b.endTime)
+      );
+
+      const remoteConflict =
+        localConflict ??
+        (await findBookingConflict({
+          roomId: booking.roomId,
+          roomCode: booking.roomCode,
+          date: booking.date,
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          onlyApproved: true,
+          excludeBookingId: booking.id,
+        }));
+
+      if (remoteConflict) {
+        setFeedback({
+          type: 'err',
+          text: `Cannot approve - conflict with another approved booking. (${remoteConflict.ownerName} · ${remoteConflict.roomCode} on ${remoteConflict.date} ${remoteConflict.startTime}–${remoteConflict.endTime})`,
+        });
+        return;
+      }
+
       await adminApproveBooking(booking, profile);
       setFeedback({
         type: 'ok',
@@ -403,6 +512,12 @@ export function AdminDashboard({
           </button>
         </div>
       </section>
+
+      {showingLocalNotice && (
+        <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 text-xs text-blue-800 dark:text-blue-200">
+          No bookings in Firestore yet - showing local
+        </div>
+      )}
 
       {feedback && (
         <div

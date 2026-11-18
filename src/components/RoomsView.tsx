@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { Calendar, List, Loader2, Search, Unlock } from 'lucide-react';
-import { adminReleaseVenue } from '../services/campusService';
+import { db } from '../firebase';
+import { adminReleaseVenue, timesOverlap } from '../services/campusService';
 import {
   CAMPUS_ZONES,
+  type Booking,
   type CampusZone,
   type Classroom,
   type RoomStatus,
@@ -36,11 +39,52 @@ export function RoomsView({
   isFallbackCatalog,
   onBookRoom,
 }: RoomsViewProps) {
+  const tomorrowDefault = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  };
+
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [statusFilter, setStatusFilter] = useState<'All' | RoomStatus>('All');
   const [zoneFilter, setZoneFilter] = useState<'All' | CampusZone>('All');
   const [search, setSearch] = useState('');
+  const [slotDate, setSlotDate] = useState(tomorrowDefault);
+  const [slotStart, setSlotStart] = useState('10:00');
+  const [slotEnd, setSlotEnd] = useState('12:00');
+  const [liveBookings, setLiveBookings] = useState<Booking[]>([]);
   const [busyRoomId, setBusyRoomId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, 'bookings'),
+      (snap) => {
+        const list = snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as Omit<Booking, 'id'>),
+        }));
+        setLiveBookings(list);
+      },
+      () => {
+        setLiveBookings([]);
+      }
+    );
+    return () => unsub();
+  }, []);
+
+  function getSlotConflict(room: Classroom): Booking | null {
+    return (
+      liveBookings.find(
+        (b) =>
+          b.status !== 'rejected' &&
+          b.status !== 'cancelled' &&
+          (b.roomId === room.id ||
+            b.roomCode.trim().toUpperCase() === room.code.trim().toUpperCase()) &&
+          b.date === slotDate &&
+          timesOverlap(slotStart, slotEnd, b.startTime, b.endTime)
+      ) ?? null
+    );
+  }
 
   const filteredRooms = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -153,25 +197,55 @@ export function RoomsView({
         />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 w-fit">
-            {STATUS_FILTERS.map((st) => {
-              const count =
-                st === 'All' ? rooms.length : rooms.filter((r) => r.status === st).length;
-              return (
-                <button
-                  key={st}
-                  type="button"
-                  onClick={() => setStatusFilter(st)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 ${
-                    statusFilter === st
-                      ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  {st} ({count})
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 w-fit">
+              {STATUS_FILTERS.map((st) => {
+                const count =
+                  st === 'All' ? rooms.length : rooms.filter((r) => r.status === st).length;
+                return (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setStatusFilter(st)}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 ${
+                      statusFilter === st
+                        ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {st} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5">
+              <span className="font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                Check Slot:
+              </span>
+              <input
+                type="date"
+                aria-label="Check date"
+                value={slotDate}
+                onChange={(e) => setSlotDate(e.target.value)}
+                className="px-2 py-1 text-xs font-mono rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950"
+              />
+              <input
+                type="time"
+                aria-label="Check start time"
+                value={slotStart}
+                onChange={(e) => setSlotStart(e.target.value)}
+                className="px-2 py-1 text-xs font-mono rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950"
+              />
+              <span className="text-slate-400">–</span>
+              <input
+                type="time"
+                aria-label="Check end time"
+                value={slotEnd}
+                onChange={(e) => setSlotEnd(e.target.value)}
+                className="px-2 py-1 text-xs font-mono rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950"
+              />
+            </div>
           </div>
 
           <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden">
@@ -209,10 +283,16 @@ export function RoomsView({
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
                     {filteredRooms.map((room) => {
                       const isBlocked = room.blocked || room.status === 'Maintenance';
+                      const slotConflict = getSlotConflict(room);
+                      const isBookedForSlot = Boolean(slotConflict);
                       return (
                         <tr
                           key={room.id}
-                          className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
+                          className={
+                            isBookedForSlot
+                              ? 'bg-slate-100/80 dark:bg-slate-800/50 opacity-65 transition-colors'
+                              : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors'
+                          }
                         >
                           <td className="py-3.5 px-6">
                             <div className="font-mono font-bold text-slate-900 dark:text-white">
@@ -229,13 +309,28 @@ export function RoomsView({
                             {room.capacity}
                           </td>
                           <td className="py-3.5 px-4">
-                            <StatusLabel status={room.status} />
+                            {isBookedForSlot ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
+                                Booked
+                              </span>
+                            ) : (
+                              <StatusLabel status={room.status} />
+                            )}
                           </td>
                           <td className="py-3.5 px-4">
                             {isBlocked ? (
                               <span className="text-amber-700 dark:text-amber-300 font-medium">
                                 {room.maintenanceNote || 'Blocked for maintenance'}
                               </span>
+                            ) : slotConflict ? (
+                              <div>
+                                <div className="font-medium text-slate-700 dark:text-slate-300">
+                                  Booked by {slotConflict.ownerName} ({slotConflict.courseCode})
+                                </div>
+                                <div className="text-slate-500 dark:text-slate-400 font-mono">
+                                  {slotConflict.date} · {slotConflict.startTime}–{slotConflict.endTime}
+                                </div>
+                              </div>
                             ) : room.currentCourse ? (
                               <div>
                                 <div className="font-medium text-slate-900 dark:text-white">
@@ -262,11 +357,15 @@ export function RoomsView({
                               {!isBlocked && (
                                 <button
                                   type="button"
-                                  disabled={isFallbackCatalog}
-                                  onClick={() => onBookRoom(room)}
-                                  className="px-3 py-1.5 text-xs font-semibold text-white bg-[#0B2D5B] hover:bg-blue-900 disabled:opacity-50 rounded-md transition-colors whitespace-nowrap"
+                                  disabled={isFallbackCatalog || isBookedForSlot}
+                                  onClick={() => onBookRoom(room, slotDate)}
+                                  className={
+                                    isBookedForSlot
+                                      ? 'px-3 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-800 cursor-not-allowed rounded-md whitespace-nowrap'
+                                      : 'px-3 py-1.5 text-xs font-semibold text-white bg-[#0B2D5B] hover:bg-blue-900 disabled:opacity-50 rounded-md transition-colors whitespace-nowrap'
+                                  }
                                 >
-                                  Request Booking
+                                  {isBookedForSlot ? 'Booked' : 'Request Booking'}
                                 </button>
                               )}
                               {profile.role === 'admin' && room.status !== 'Available' && (

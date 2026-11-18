@@ -68,6 +68,53 @@ export function isBookingInFuture(dateStr: string, startTime: string): boolean {
   return target.getTime() > now.getTime();
 }
 
+function toMinutes(timeStr: string): number {
+  const parts = timeStr.trim().split(':');
+  const h = Number(parts[0] ?? 0);
+  const m = Number(parts[1] ?? 0);
+  return h * 60 + m;
+}
+
+export function timesOverlap(
+  startA: string,
+  endA: string,
+  startB: string,
+  endB: string
+): boolean {
+  if (!startA || !endA || !startB || !endB) return false;
+  return toMinutes(startA) < toMinutes(endB) && toMinutes(endA) > toMinutes(startB);
+}
+
+export async function findBookingConflict(params: {
+  roomId: string;
+  roomCode: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  onlyApproved?: boolean;
+  excludeBookingId?: string;
+}): Promise<Booking | null> {
+  const snap = await getDocs(collection(db, 'bookings'));
+  for (const d of snap.docs) {
+    if (params.excludeBookingId && d.id === params.excludeBookingId) continue;
+    const b = { id: d.id, ...(d.data() as Omit<Booking, 'id'>) };
+    const sameRoom =
+      b.roomId === params.roomId ||
+      b.roomCode.trim().toUpperCase() === params.roomCode.trim().toUpperCase();
+    if (!sameRoom) continue;
+    if (b.date !== params.date) continue;
+    if (params.onlyApproved) {
+      if (b.status !== 'approved') continue;
+    } else {
+      if (b.status === 'rejected' || b.status === 'cancelled') continue;
+    }
+    if (timesOverlap(params.startTime, params.endTime, b.startTime, b.endTime)) {
+      return b;
+    }
+  }
+  return null;
+}
+
 export const AUTO_ADMIN_EMAILS = [
   'alidujohnwumbe12i@gmail.com',
   'admin@ucc.edu.gh',
@@ -80,13 +127,8 @@ export function isAutoAdminEmail(email?: string | null): boolean {
 }
 
 export function isAdminProfile(profile?: UserProfile | null): boolean {
-  if (!profile) return false;
-  return (
-    isAutoAdminEmail(profile.email) ||
-    profile.role === 'admin' ||
-    profile.campusRole === 'Admin' ||
-    profile.campusRole === 'Administrator'
-  );
+  const isAdmin = profile?.email?.trim().toLowerCase() === 'alidujohnwumbe12i@gmail.com';
+  return isAdmin;
 }
 
 export function hasFirestoreAdminAccess(profile?: UserProfile | null): boolean {
