@@ -1,7 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import {
   Activity,
-  AlertCircle,
   Ban,
   Building2,
   Calendar,
@@ -30,7 +29,6 @@ import {
   adminSaveVenue,
   adminToggleVenueMaintenance,
   adminUpdateUser,
-  hasFirestoreAdminAccess,
 } from '../services/campusService';
 import {
   CAMPUS_ZONES,
@@ -83,7 +81,6 @@ export function AdminDashboard({
   const [bookingSearch, setBookingSearch] = useState('');
   const [userSearch, setUserSearch] = useState('');
   const [venueSubView, setVenueSubView] = useState<'crud' | 'calendar'>('crud');
-  const canQueryAdminData = hasFirestoreAdminAccess(profile);
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
@@ -396,32 +393,16 @@ export function AdminDashboard({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          {canQueryAdminData && (
-            <button
-              type="button"
-              onClick={openNewVenueModal}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg transition-colors whitespace-nowrap"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              <span>Add Venue</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={openNewVenueModal}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg transition-colors whitespace-nowrap"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>Add Venue</span>
+          </button>
         </div>
       </section>
-
-      {!canQueryAdminData && (
-        <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-3">
-          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-          <div className="space-y-1">
-            <p className="font-semibold">
-              System Administrator Elevation Required for Global Records
-            </p>
-            <p>
-              Your Academic Role is set to <strong>{profile.campusRole}</strong>, while your Firestore security role is currently <strong>{profile.role}</strong>. Ask an existing Admin in User Management to grant <strong>admin</strong> access to unlock global approvals, user management, and venue writes.
-            </p>
-          </div>
-        </div>
-      )}
 
       {feedback && (
         <div
@@ -617,7 +598,7 @@ export function AdminDashboard({
                   <div className="flex items-center gap-2.5 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100 dark:border-slate-800">
                     <button
                       type="button"
-                      disabled={!canQueryAdminData || busyId === b.id}
+                      disabled={busyId === b.id}
                       onClick={() => void handleApprove(b)}
                       className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg transition-colors whitespace-nowrap"
                     >
@@ -630,7 +611,7 @@ export function AdminDashboard({
                     </button>
                     <button
                       type="button"
-                      disabled={!canQueryAdminData || busyId === b.id}
+                      disabled={busyId === b.id}
                       onClick={() => {
                         setReviewModal({ mode: 'reject', booking: b });
                         setReviewReason('');

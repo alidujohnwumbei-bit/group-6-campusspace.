@@ -69,8 +69,7 @@ export function isBookingInFuture(dateStr: string, startTime: string): boolean {
 }
 
 export const AUTO_ADMIN_EMAILS = [
-  'alidujohnwumbei12@gmail.com',
-  'alidujohnwumbel12@gmail.com',
+  'alidujohnwumbe12i@gmail.com',
   'admin@ucc.edu.gh',
 ] as const;
 
@@ -83,16 +82,15 @@ export function isAutoAdminEmail(email?: string | null): boolean {
 export function isAdminProfile(profile?: UserProfile | null): boolean {
   if (!profile) return false;
   return (
+    isAutoAdminEmail(profile.email) ||
     profile.role === 'admin' ||
     profile.campusRole === 'Admin' ||
-    profile.campusRole === 'Administrator' ||
-    isAutoAdminEmail(profile.email)
+    profile.campusRole === 'Administrator'
   );
 }
 
 export function hasFirestoreAdminAccess(profile?: UserProfile | null): boolean {
-  if (!profile) return false;
-  return profile.role === 'admin' || isAutoAdminEmail(profile.email);
+  return isAdminProfile(profile);
 }
 
 export function resolveDefaultRole(email: string, requestedRole?: SystemRole): SystemRole {
@@ -110,7 +108,31 @@ export async function getUserProfile(
   const path = `users/${uid}`;
   try {
     const snap = await getDoc(doc(db, 'users', uid));
-    if (!snap.exists()) return null;
+    if (!snap.exists()) {
+      if (isAutoAdminEmail(authEmail)) {
+        const cleanEmail = (authEmail ?? 'alidujohnwumbe12i@gmail.com').trim().toLowerCase();
+        const adminPayload = {
+          uid,
+          fullName: auth.currentUser?.displayName?.trim() || 'CampusSpace Admin',
+          email: cleanEmail,
+          uccId: 'UCC-ADMIN-01',
+          department: 'Campus AV & Facilities Unit',
+          role: 'admin' as SystemRole,
+          campusRole: 'Admin' as CampusRole,
+          phone: '',
+          disabled: false,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+        await setDoc(doc(db, 'users', uid), adminPayload);
+        return {
+          ...adminPayload,
+          createdAt: undefined,
+          updatedAt: undefined,
+        };
+      }
+      return null;
+    }
     const raw = snap.data() as Partial<UserProfile>;
     const effectiveEmail = authEmail ?? raw.email ?? '';
     const autoAdmin = isAutoAdminEmail(effectiveEmail);

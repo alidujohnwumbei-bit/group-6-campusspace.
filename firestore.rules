@@ -26,8 +26,7 @@ service cloud.firestore {
     function isAutoAdminEmail() {
       return isSignedIn() && (
         request.auth.token.email == 'admin@ucc.edu.gh' ||
-        request.auth.token.email == 'alidujohnwumbei12@gmail.com' ||
-        request.auth.token.email == 'alidujohnwumbel12@gmail.com'
+        request.auth.token.email == 'alidujohnwumbe12i@gmail.com'
       );
     }
 
