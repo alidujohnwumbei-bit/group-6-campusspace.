@@ -254,52 +254,18 @@ service cloud.firestore {
       allow delete: if isAdmin() && isValidId(scheduleId);
     }
 
-    // Bookings: any authenticated user can read all bookings and create pending bookings;
-    // users can cancel own bookings; only admin can approve/reject/force-cancel or delete.
+    // Bookings: any authenticated user can read and create bookings;
+    // owners can cancel their own bookings; admins can approve/reject/force-cancel/delete.
     match /bookings/{bookingId} {
       allow get: if isSignedIn() && isValidId(bookingId);
       allow list: if isSignedIn();
-      allow create: if isSignedIn()
-        && isNotDisabled()
-        && isValidId(bookingId)
-        && isValidBooking(incoming())
-        && incoming().status == 'pending'
-        && incoming().requestedBy == request.auth.uid
-        && incoming().ownerId == request.auth.uid
-        && (!('requesterUid' in incoming()) || incoming().requesterUid == request.auth.uid)
-        && incoming().reviewedBy == ''
-        && incoming().reviewedByName == ''
-        && incoming().reviewedAt == null
-        && incoming().reason == ''
-        && incoming().cancelledByName == ''
-        && incoming().requestedAt == request.time
-        && incoming().createdAt == request.time
-        && incoming().updatedAt == request.time;
+      allow create: if isSignedIn() && isValidId(bookingId);
       allow update: if isSignedIn()
         && isValidId(bookingId)
-        && isValidBooking(incoming())
-        && incoming().requestedBy == existing().requestedBy
-        && incoming().ownerId == existing().ownerId
-        && incoming().roomId == existing().roomId
-        && incoming().requestedAt == existing().requestedAt
-        && incoming().createdAt == existing().createdAt
-        && incoming().updatedAt == request.time
         && (
-          (
-            isAdmin() &&
-            incoming().status in ['approved', 'rejected', 'cancelled'] &&
-            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedByName', 'reviewedAt', 'reason', 'cancelledByName', 'updatedAt'])
-          ) ||
-          (
-            isNotDisabled() &&
-            existing().requestedBy == request.auth.uid &&
-            existing().status in ['pending', 'approved'] &&
-            incoming().status == 'cancelled' &&
-            incoming().reviewedBy == existing().reviewedBy &&
-            incoming().reviewedByName == existing().reviewedByName &&
-            incoming().reviewedAt == existing().reviewedAt &&
-            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'reason', 'cancelledByName', 'updatedAt'])
-          )
+          isAdmin() ||
+          existing().requestedBy == request.auth.uid ||
+          existing().ownerId == request.auth.uid
         );
       allow delete: if isAdmin() && isValidId(bookingId);
     }
